@@ -1,7 +1,7 @@
 package cpu
 
 // 8 bit registers
-type Register struct {
+type Registers struct {
 	a byte // Accumulator
 	f byte // Flags
 
@@ -18,38 +18,38 @@ type Register struct {
 	pc [2]byte // Program counter
 }
 
-func (r *Register) writeAF(data [2]byte) {
-	r.a = data[0]
-	r.f = data[1]
+func (regs *Registers) writeAF(data [2]byte) {
+	regs.a = data[0]
+	regs.f = data[1]
 }
 
-func (r *Register) readAF() [2]byte {
-	return [2]byte{r.a, r.f}
+func (regs *Registers) readAF() [2]byte {
+	return [2]byte{regs.a, regs.f}
 }
 
-func (r *Register) writeBC(data [2]byte) {
-	r.b = data[0]
-	r.c = data[1]
+func (regs *Registers) writeBC(data [2]byte) {
+	regs.b = data[0]
+	regs.c = data[1]
 }
 
-func (r *Register) readBC() [2]byte {
-	return [2]byte{r.b, r.c}
+func (regs *Registers) readBC() [2]byte {
+	return [2]byte{regs.b, regs.c}
 }
 
-func (r *Register) writeDE(data [2]byte) {
-	r.d = data[0]
-	r.e = data[1]
+func (regs *Registers) writeDE(data [2]byte) {
+	regs.d = data[0]
+	regs.e = data[1]
 }
 
-func (r *Register) readDE() [2]byte {
-	return [2]byte{r.d, r.e}
+func (regs *Registers) readDE() [2]byte {
+	return [2]byte{regs.d, regs.e}
 }
 
-func (r *Register) writeHL(data [2]byte) {
-	r.h = data[0]
-	r.l = data[1]
+func (regs *Registers) writeHL(data [2]byte) {
+	regs.h = data[0]
+	regs.l = data[1]
 }
 
-func (r *Register) readHL() [2]byte {
-	return [2]byte{r.h, r.l}
+func (regs *Registers) readHL() [2]byte {
+	return [2]byte{regs.h, regs.l}
 }

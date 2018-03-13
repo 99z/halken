@@ -1,3 +1,5 @@
+// Contains instruction opcodes & definitions
+// Reference: http://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 package cpu
 
 // Holds all relevant information for CPU instructions
@@ -7,16 +9,16 @@ type Instruction struct {
 	Mnemonic    string
 	Cycles      int
 	NumOperands int
-	Operands    [2]byte // [2]byte will hold 8-bit and 16-bit operands
+	Executor	func()	// Executes appropriate function
 }
 
 // Non-CB prefixed instructions
-// 'n' is an 8bit operation, 'nn' is 16-bit
+// 'n' is an 8-bit operation, 'nn' is 16-bit
 var instructions map[byte]Instruction = map[byte]Instruction{
-	0x00: Instruction{"NOP", 4, 0, [2]byte{}},
-	0x01: Instruction{"LD BC,nn", 12, 2, [2]byte{}},
-	0x02: Instruction{"LD (BC),A", 8, 0, [2]byte{}},
-	0x03: Instruction{"INC BC", 8, 0, [2]byte{}},
+	0x00: Instruction{"NOP", 4, 0, func() { }},
+	0x01: Instruction{"LD BC,nn", 12, 2, func() { cpu.LDrr-16(&cpu.b, &cpu.c) }},
+	0x02: Instruction{"LD (BC),A", 8, 0, func() { cpu.LDrr-r(&cpu.b, &cpu.c, &cpu.a) }},
+	0x03: Instruction{"INC BC", 8, 0, func() { cpu.INCrr(&cpu.b, &cpu.c) },
 	0x04: Instruction{"INC B", 4, 0, [2]byte{}},
 	0x05: Instruction{"DEC B", 4, 0, [2]byte{}},
 	0x06: Instruction{"LD B,n", 8, 1, [2]byte{}},
@@ -77,11 +79,29 @@ var instructions map[byte]Instruction = map[byte]Instruction{
 	0x3D: Instruction{"DEC A", 4, 0, [2]byte{}},
 	0x3E: Instruction{"LD A,n", 8, 1, [2]byte{}},
 	0x3F: Instruction{"CCF", 4, 0, [2]byte{}},
+	0x40: Instruction{"LD B,B", 4, 0, [2]byte{}},
+	0x41: Instruction{"LD B,C", 4, 0, [2]byte{}},
+	0x42: Instruction{"LD B,D", 4, 0, [2]byte{}},
+	0x43: Instruction{"LD B,E", 4, 0, [2]byte{}},
+	0x44: Instruction{"LD B,H", 4, 0, [2]byte{}},
+	0x45: Instruction{"LD B,L", 4, 0, [2]byte{}},
+	0x46: Instruction{"LD B,(HL)", 8, 0, [2]byte{}},
+	0x47: Instruction{"LD B,A", 4, 0, [2]byte{}},
+	0x48: Instruction{"LD C,B", 4, 0, [2]byte{}},
+	0x49: Instruction{"LD C,C", 4, 0, [2]byte{}},
+	0x4A: Instruction{"LD C,D", 4, 0, [2]byte{}},
+	0x4B: Instruction{"LD C,E", 4, 0, [2]byte{}},
+	0x4C: Instruction{"LD C,H", 4, 0, [2]byte{}},
+	0x4D: Instruction{"LD C,L", 4, 0, [2]byte{}},
+	0x4E: Instruction{"LD C,(HL)", 8, 0, [2]byte{}},
+	0x4F: Instruction{"LD C,A", 4, 0, [2]byte{}},
+	
 }
 
 // CB prefixed instructions
 // CB is the prefix byte. Like the Z80, the Sharp LR35902 will
 // look up a CB prefixed instruction in a different instruction bank
+// More info: http://www.z80.info/decoding.htm
 var instructionsCB map[byte]Instruction = map[byte]Instruction{
 	0x00: Instruction{"RLC B", 8, 0, [2]byte{}},
 }
