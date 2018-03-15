@@ -7,13 +7,15 @@ type GBCPU struct {
 	mCycles	int
 	// Total time cycles
 	tCycles	int
-	regs	*Registers
+	Regs	*Registers
 	Instrs	map[byte]Instruction
 }
 
 func (gbcpu *GBCPU) InitCPU() {
-	gbcpu.regs = new(Registers)
-	gbcpu.regs.pc = 0x0150
+	gbcpu.Regs = new(Registers)
+	// For now, start PC at usual jump destination after
+	// cartridge header information
+	gbcpu.Regs.PC = 0x0150
 	gbcpu.loadInstructions()
 }
 

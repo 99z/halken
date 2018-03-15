@@ -3,7 +3,6 @@ package cpu
 
 import (
 	"../mmu"
-	"fmt"
 	"encoding/binary"
 )
 
@@ -38,8 +37,8 @@ func (gbcpu *GBCPU) INCrr(high, low *byte) {
 }
 
 func (gbcpu *GBCPU) JPaa() {
-	jmpAddr := GbMMU.Cart.MBC[gbcpu.regs.pc+1:gbcpu.regs.pc+3]
-	gbcpu.regs.pc = binary.LittleEndian.Uint16(jmpAddr)
+	jmpAddr := GbMMU.Cart.MBC[gbcpu.Regs.PC+1:gbcpu.Regs.PC+3]
+	gbcpu.Regs.PC = binary.LittleEndian.Uint16(jmpAddr)
 }
 
 // Pull out into utilities file?

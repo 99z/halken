@@ -27,11 +27,9 @@ func main() {
 	fmt.Printf("Title: %s\nCGBFlag: %v\nType: %v\nROM: %v\nRAM: %v\n",
 		GbMMU.Cart.Title, GbMMU.Cart.CGBFlag, GbMMU.Cart.Type, GbMMU.Cart.ROMSize, GbMMU.Cart.RAMSize)
 	
-	for i := 0; i < 10; i++ {
-		operation := GbMMU.Cart.MBC[i]
+	for i := 0; i < 2; i++ {
+		operation := GbMMU.Cart.MBC[GbCPU.Regs.PC]
 		fmt.Printf("%02X\t%v\n", operation, GbCPU.Instrs[operation])
+		GbCPU.Instrs[GbMMU.Cart.MBC[0]].Executor()
 	}
-	
-	fmt.Println(len(GbMMU.Cart.MBC))
-	GbCPU.Instrs[GbMMU.Cart.MBC[0]].Executor()
 }

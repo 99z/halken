@@ -17,7 +17,7 @@ type Registers struct {
 	sp [2]byte // Stack pointer
 	// Program counter
 	// I THINK this will just refer to an index of the ROM as a byte array
-	pc uint16
+	PC uint16
 }
 
 func (regs *Registers) writeAF(data [2]byte) {

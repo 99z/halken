@@ -22,9 +22,9 @@ type Instruction struct {
 func (gbcpu *GBCPU) loadInstructions() {
 	gbcpu.Instrs = map[byte]Instruction{
 		0x00: Instruction{"NOP", 4, 0, func() {}},
-		0x01: Instruction{"LD BC,i16", 12, 2, func() { gbcpu.LDrr_n(&gbcpu.regs.b, &gbcpu.regs.c) }},
-		0x02: Instruction{"LD (BC),A", 8, 0, func() { gbcpu.LDrr_r(&gbcpu.regs.b, &gbcpu.regs.c, &gbcpu.regs.a) }},
-		0x03: Instruction{"INC BC", 8, 0, func() { gbcpu.INCrr(&gbcpu.regs.b, &gbcpu.regs.c) }},
+		0x01: Instruction{"LD BC,i16", 12, 2, func() { gbcpu.LDrr_n(&gbcpu.Regs.b, &gbcpu.Regs.c) }},
+		0x02: Instruction{"LD (BC),A", 8, 0, func() { gbcpu.LDrr_r(&gbcpu.Regs.b, &gbcpu.Regs.c, &gbcpu.Regs.a) }},
+		0x03: Instruction{"INC BC", 8, 0, func() { gbcpu.INCrr(&gbcpu.Regs.b, &gbcpu.Regs.c) }},
 		0x04: Instruction{"INC B", 4, 0, func() {}},
 		0x05: Instruction{"DEC B", 4, 0, func() {}},
 		0x06: Instruction{"LD B,i8", 8, 1, func() {}},
