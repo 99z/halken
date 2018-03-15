@@ -7,26 +7,31 @@ import (
 	"os"
 )
 
+// Global variables for component structs
+var GbCPU = new(cpu.GBCPU)
+var GbMMU = new(mmu.GBMMU)
+
 func main() {
 	CartPath := os.Args[1]
 	
-	gbmmu := new(mmu.GBMMU)
-	gbmmu.InitMMU()
+	cpu.GbMMU = GbMMU
+	GbMMU.InitMMU()
+	GbCPU.InitCPU()
 	
-	gbcpu := new(cpu.GBCPU)
-	gbcpu.InitCPU()
-	
-	err := gbmmu.LoadCart(CartPath)
+	err := GbMMU.LoadCart(CartPath)
 	if err != nil {
 		fmt.Println("main: %s", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Title: %s\nCGBFlag: %v\nType: %v\nROM: %v\nRAM: %v\n",
-		gbmmu.Cart.Title, gbmmu.Cart.CGBFlag, gbmmu.Cart.Type, gbmmu.Cart.ROMSize, gbmmu.Cart.RAMSize)
+		GbMMU.Cart.Title, GbMMU.Cart.CGBFlag, GbMMU.Cart.Type, GbMMU.Cart.ROMSize, GbMMU.Cart.RAMSize)
 	
 	for i := 0; i < 10; i++ {
-		operation := gbmmu.Cart.MBC[i]
-		fmt.Printf("%02X\t%v\n", operation, gbcpu.Instrs[operation])
+		operation := GbMMU.Cart.MBC[i]
+		fmt.Printf("%02X\t%v\n", operation, GbCPU.Instrs[operation])
 	}
+	
+	fmt.Println(len(GbMMU.Cart.MBC))
+	GbCPU.Instrs[GbMMU.Cart.MBC[0]].Executor()
 }

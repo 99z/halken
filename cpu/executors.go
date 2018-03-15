@@ -1,7 +1,16 @@
 // Contains functions to execute assembly instructions
 package cpu
 
-func (cpu *GBCPU) LDrr_n(reg1, reg2 *byte) {
+import (
+	"../mmu"
+	"fmt"
+)
+
+// Variable injection from main.go
+// Prevents having to set MMU pointer as a field on the CPU struct
+var GbMMU *mmu.GBMMU
+
+func (gbcpu *GBCPU) LDrr_n(reg1, reg2 *byte) {
 	// get 16 bit operand
 
 	// Little Endian, so reversed
@@ -9,14 +18,14 @@ func (cpu *GBCPU) LDrr_n(reg1, reg2 *byte) {
 	//*reg2 = operand[0]
 }
 
-func (cpu *GBCPU) LDrr_r(high, low, op *byte) {
+func (gbcpu *GBCPU) LDrr_r(high, low, op *byte) {
 	// Should this be filling first byte with zeros?
 	*high = *op
 	*low = 0x00
 }
 
-func (cpu *GBCPU) INCrr(high, low *byte) {
-	rr := cpu.JoinBytes(*high, *low)
+func (gbcpu *GBCPU) INCrr(high, low *byte) {
+	rr := gbcpu.JoinBytes(*high, *low)
 	rr++
 
 	newHigh := byte(((rr >> 8) & 0xFF))
@@ -27,12 +36,15 @@ func (cpu *GBCPU) INCrr(high, low *byte) {
 	low = &newLow
 }
 
-func (cpu *GBCPU) JPaa(pc *[2]byte) {
-	//high := cart[pc+sizeof(byte)]
-	//low := cart[pc+(sizeof(byte)*2)]
+func (gbcpu *GBCPU) JPaa() {
+	high := GbMMU.Cart.MBC[gbcpu.regs.pc+2]
+	low := GbMMU.Cart.MBC[gbcpu.regs.pc+1]
+	
+	gbcpu.regs.pc = gbcpu.JoinBytes(high, low)
+	fmt.Println(gbcpu.regs.pc)
 }
 
 // Pull out into utilities file?
-func (cpu *GBCPU) JoinBytes(high, low byte) uint16 {
+func (gbcpu *GBCPU) JoinBytes(high, low byte) uint16 {
 	return uint16((high << 8) | (low & 0xFF))
 }

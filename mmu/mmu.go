@@ -16,7 +16,6 @@ type GBMMU struct {
 	ram		[2][4096]byte
 	// Reserved
 	echoram	[7680]byte
-	
 }
 
 func (gbmmu *GBMMU) InitMMU() {
