@@ -21,3 +21,5 @@ just printing the final output at the end.
 ```
 
 This is how I'll be testing halken, especially early on.
+
+The CPU instructions test ROM requires MBC1 to be implemented, but the individual CPU tests do not. I included them for this reason.
