@@ -4,6 +4,7 @@ package cpu
 import (
 	"../mmu"
 	"fmt"
+	"encoding/binary"
 )
 
 // Variable injection from main.go
@@ -37,11 +38,8 @@ func (gbcpu *GBCPU) INCrr(high, low *byte) {
 }
 
 func (gbcpu *GBCPU) JPaa() {
-	high := GbMMU.Cart.MBC[gbcpu.regs.pc+2]
-	low := GbMMU.Cart.MBC[gbcpu.regs.pc+1]
-	
-	gbcpu.regs.pc = gbcpu.JoinBytes(high, low)
-	fmt.Println(gbcpu.regs.pc)
+	jmpAddr := GbMMU.Cart.MBC[gbcpu.regs.pc+1:gbcpu.regs.pc+3]
+	gbcpu.regs.pc = binary.LittleEndian.Uint16(jmpAddr)
 }
 
 // Pull out into utilities file?

@@ -13,6 +13,7 @@ type GBCPU struct {
 
 func (gbcpu *GBCPU) InitCPU() {
 	gbcpu.regs = new(Registers)
+	gbcpu.regs.pc = 0x0150
 	gbcpu.loadInstructions()
 }
 

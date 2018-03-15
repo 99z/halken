@@ -12,13 +12,13 @@ var GbCPU = new(cpu.GBCPU)
 var GbMMU = new(mmu.GBMMU)
 
 func main() {
-	CartPath := os.Args[1]
+	cartPath := os.Args[1]
 	
 	cpu.GbMMU = GbMMU
 	GbMMU.InitMMU()
 	GbCPU.InitCPU()
 	
-	err := GbMMU.LoadCart(CartPath)
+	err := GbMMU.LoadCart(cartPath)
 	if err != nil {
 		fmt.Println("main: %s", err)
 		os.Exit(1)
