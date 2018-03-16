@@ -15,7 +15,7 @@ func (gbcpu *GBCPU) InitCPU() {
 	gbcpu.Regs = new(Registers)
 	// For now, start PC at usual jump destination after
 	// cartridge header information
-	gbcpu.Regs.PC = 0x0150
+	gbcpu.Regs.PC = append(gbcpu.Regs.PC, 0x50, 0x01)
 	gbcpu.loadInstructions()
 }
 

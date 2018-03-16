@@ -5,6 +5,7 @@ import (
 	"./cpu"
 	"fmt"
 	"os"
+	"encoding/binary"
 )
 
 // Global variables for component structs
@@ -27,9 +28,10 @@ func main() {
 	fmt.Printf("Title: %s\nCGBFlag: %v\nType: %v\nROM: %v\nRAM: %v\n",
 		GbMMU.Cart.Title, GbMMU.Cart.CGBFlag, GbMMU.Cart.Type, GbMMU.Cart.ROMSize, GbMMU.Cart.RAMSize)
 	
-	for i := 0; i < 2; i++ {
-		operation := GbMMU.Cart.MBC[GbCPU.Regs.PC]
+	for i := 0; i < 10; i++ {
+		opcode := GbCPU.Regs.PC[:]
+		operation := GbMMU.Cart.MBC[binary.LittleEndian.Uint16(opcode)]
 		fmt.Printf("%02X\t%v\n", operation, GbCPU.Instrs[operation])
-		GbCPU.Instrs[GbMMU.Cart.MBC[0]].Executor()
+		GbCPU.Instrs[operation].Executor()
 	}
 }

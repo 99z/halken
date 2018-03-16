@@ -10,6 +10,8 @@ type Instruction struct {
 	// Number of T cycles instruction takes to execute
 	// Divide by 4 to get number of M cycles
 	tCycles     int
+	// Currently this isn't actually used - can't think of a way to reference
+	// this value by the time we are inside of an executor function
 	NumOperands int
 	Executor    func() // Executes appropriate function
 }
@@ -22,18 +24,18 @@ type Instruction struct {
 func (gbcpu *GBCPU) loadInstructions() {
 	gbcpu.Instrs = map[byte]Instruction{
 		0x00: Instruction{"NOP", 4, 0, func() {}},
-		0x01: Instruction{"LD BC,i16", 12, 2, func() { gbcpu.LDrr_n(&gbcpu.Regs.b, &gbcpu.Regs.c) }},
+		0x01: Instruction{"LD BC,i16", 12, 2, func() { gbcpu.LDrr_nn(&gbcpu.Regs.b, &gbcpu.Regs.c) }},
 		0x02: Instruction{"LD (BC),A", 8, 0, func() { gbcpu.LDrr_r(&gbcpu.Regs.b, &gbcpu.Regs.c, &gbcpu.Regs.a) }},
 		0x03: Instruction{"INC BC", 8, 0, func() { gbcpu.INCrr(&gbcpu.Regs.b, &gbcpu.Regs.c) }},
-		0x04: Instruction{"INC B", 4, 0, func() {}},
-		0x05: Instruction{"DEC B", 4, 0, func() {}},
-		0x06: Instruction{"LD B,i8", 8, 1, func() {}},
-		0x07: Instruction{"RLCA", 4, 0, func() {}},
-		0x08: Instruction{"LD (a16),SP", 20, 2, func() {}},
-		0x09: Instruction{"ADD HL,BC", 8, 0, func() {}},
-		0x0A: Instruction{"LD A,(BC)", 8, 0, func() {}},
-		0x0B: Instruction{"DEC BC", 8, 0, func() {}},
-		0x0C: Instruction{"INC C", 4, 0, func() {}},
+		0x04: Instruction{"INC B", 4, 0, func() { gbcpu.INCr(&gbcpu.Regs.b) }},
+		0x05: Instruction{"DEC B", 4, 0, func() { gbcpu.DECr(&gbcpu.Regs.b) }},
+		0x06: Instruction{"LD B,i8", 8, 1, func() { gbcpu.LDr_n(&gbcpu.Regs.b) }},
+		0x07: Instruction{"RLCA", 4, 0, func() { gbcpu.RLCA(&gbcpu.Regs.a) }},
+		0x08: Instruction{"LD (a16),SP", 20, 2, func() { gbcpu.LDnn_SP() }},
+		0x09: Instruction{"ADD HL,BC", 8, 0, func() { gbcpu.ADDrr_rr(&gbcpu.Regs.h, &gbcpu.Regs.l, &gbcpu.Regs.b, &gbcpu.Regs.c) }},
+		0x0A: Instruction{"LD A,(BC)", 8, 0, func() { gbcpu.LDr_rr(&gbcpu.Regs.a, &gbcpu.Regs.b, &gbcpu.Regs.c) }},
+		0x0B: Instruction{"DEC BC", 8, 0, func() { gbcpu.DECrr(&gbcpu.Regs.b, &gbcpu.Regs.c) }},
+		0x0C: Instruction{"INC C", 4, 0, func() { gbcpu.INCr(&gbcpu.Regs.c) }},
 		0x0D: Instruction{"DEC C", 4, 0, func() {}},
 		0x0E: Instruction{"LD C,i8", 8, 1, func() {}},
 		0x0F: Instruction{"RRCA", 4, 0, func() {}},
