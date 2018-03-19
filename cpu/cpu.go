@@ -1,16 +1,24 @@
+// Package cpu emulates the Sharp LR35902
+// executors contains implementations of assembly instructions
+// registers contains register information and methods
+// instructions contains all CPU instructions
 package cpu
 
+// GBCPU represents an instance of an LR35902
 // Reference: http://www.zilog.com/docs/z80/um0080.pdf
 // Page 80 discusses clocks
 type GBCPU struct {
 	// Total machine cycles
-	mCycles	int
+	mCycles int
 	// Total time cycles
-	tCycles	int
-	Regs	*Registers
-	Instrs	map[byte]Instruction
+	tCycles int
+	Regs    *Registers
+	Instrs  map[byte]Instruction
 }
 
+// InitCPU initializes a new CPU struct
+// Sets Regs and Instrs fields
+// Sets program counter to location
 func (gbcpu *GBCPU) InitCPU() {
 	gbcpu.Regs = new(Registers)
 	// For now, start PC at usual jump destination after
@@ -20,5 +28,6 @@ func (gbcpu *GBCPU) InitCPU() {
 }
 
 func (gbcpu *GBCPU) readPC() {
-	
+	// TODO
+	// Might need if decide not to export Regs
 }

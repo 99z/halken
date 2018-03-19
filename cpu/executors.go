@@ -1,12 +1,12 @@
-// Contains functions to execute assembly instructions
 package cpu
 
 import (
-	"../mmu"
 	"encoding/binary"
+
+	"../mmu"
 )
 
-// Variable injection from main.go
+// GbMMU variable injection from main.go
 // Prevents having to set MMU pointer as a field on the CPU struct
 var GbMMU *mmu.GBMMU
 
@@ -18,6 +18,18 @@ func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 	operands := gbcpu.getOperands(2)
 
 	gbcpu.Regs.writePair(reg1, reg2, operands)
+}
+
+func (gbcpu *GBCPU) LDSPrr(reg1, reg2 *byte) {
+	gbcpu.Regs.sp = []byte{*reg1, *reg2}
+}
+
+func (gbcpu *GBCPU) LDrrSPs(reg1, reg2 *byte) {
+	operand := gbcpu.getOperands(1)
+	val := gbcpu.sliceToInt(gbcpu.Regs.sp) + uint16(operand[0])
+	bytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(bytes, val)
+	gbcpu.Regs.sp = bytes
 }
 
 func (gbcpu *GBCPU) LDrn(reg *byte) {
@@ -101,6 +113,15 @@ func (gbcpu *GBCPU) RRA() {
 	gbcpu.Regs.a = gbcpu.Regs.a >> 9
 }
 
+// RST pushes current PC + 3 onto stack
+// MSB of PC is set to 0x00, LSB is set to argument
+func (gbcpu *GBCPU) RST(imm byte) {
+	val := gbcpu.sliceToInt(gbcpu.Regs.PC)
+	val += 3
+	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, val)
+	gbcpu.Regs.PC = []byte{imm, 0x00}
+}
+
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
 	val := gbcpu.getValCartAddr(&operands[1], &operands[0], 2)
@@ -117,15 +138,26 @@ func (gbcpu *GBCPU) ADDrr(reg1, reg2 *byte) {
 	*reg1 = result
 }
 
+func (gbcpu *GBCPU) ADDrn(reg *byte) {
+	operands := gbcpu.getOperands(1)
+	*reg = *reg + operands[0]
+}
+
+func (gbcpu *GBCPU) ADCrn(reg *byte) {
+	operands := gbcpu.getOperands(1)
+	result := *reg + operands[0] + ((gbcpu.Regs.f >> 4) & 1)
+	*reg = result
+}
+
 // Same as ADD, but also adds the carry bit
 func (gbcpu *GBCPU) ADCrr(reg1, reg2 *byte) {
-	result := *reg1 + *reg2 + (gbcpu.Regs.f & (1 << 4))
+	result := *reg1 + *reg2 + ((gbcpu.Regs.f >> 4) & 1)
 	*reg1 = result
 }
 
 func (gbcpu *GBCPU) ADCraa(reg, a1, a2 *byte) {
 	val := gbcpu.getValCartAddr(a1, a2, 1)
-	*reg = *reg + val[0] + (gbcpu.Regs.f & (1 << 4))
+	*reg = *reg + val[0] + ((gbcpu.Regs.f >> 4) & 1)
 }
 
 func (gbcpu *GBCPU) ADDraa(reg, a1, a2 *byte) {
@@ -138,8 +170,125 @@ func (gbcpu *GBCPU) ADDrrrr(left1, left2, right1, right2 *byte) {
 	*left2 = *right2
 }
 
+func (gbcpu *GBCPU) ADDSPs() {
+	operands := gbcpu.getOperands(1)
+	val := uint16(operands[0]) + gbcpu.sliceToInt(gbcpu.Regs.sp)
+	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, val)
+}
+
 func (gbcpu *GBCPU) ADDrrSP(reg1, reg2 *byte) {
 	gbcpu.Regs.writePair(reg1, reg2, []byte{gbcpu.Regs.sp[0], gbcpu.Regs.sp[1]})
+}
+
+func (gbcpu *GBCPU) ANDr(reg *byte) {
+	gbcpu.Regs.a &= *reg
+	if gbcpu.Regs.a == 0x00 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) ANDn() {
+	operands := gbcpu.getOperands(1)
+	gbcpu.Regs.a &= operands[0]
+	if gbcpu.Regs.a == 0x00 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) ANDaa(a1, a2 *byte) {
+	val := gbcpu.getValCartAddr(a1, a2, 1)
+	gbcpu.Regs.a &= val[0]
+	if gbcpu.Regs.a == 0x00 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) ORr(reg *byte) {
+	gbcpu.Regs.a |= *reg
+	if gbcpu.Regs.a == 0x00 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) ORn() {
+	operand := gbcpu.getOperands(1)
+	gbcpu.Regs.a |= operand[0]
+	if gbcpu.Regs.a == 0x00 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) ORaa(a1, a2 *byte) {
+	val := gbcpu.getValCartAddr(a1, a2, 1)
+	gbcpu.Regs.a |= val[0]
+	if gbcpu.Regs.a == 0x00 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) XORr(reg *byte) {
+	gbcpu.Regs.a ^= *reg
+	if gbcpu.Regs.a == 0 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) XORn() {
+	operand := gbcpu.getOperands(1)
+	gbcpu.Regs.a ^= operand[0]
+	if gbcpu.Regs.a == 0 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reset zero flag
+	}
+}
+
+func (gbcpu *GBCPU) XORaa(a1, a2 *byte) {
+	val := gbcpu.getValCartAddr(a1, a2, 1)
+	gbcpu.Regs.a ^= val[0]
+	if gbcpu.Regs.a == 0 {
+		// TODO
+		// Set zero flag
+	} else {
+		// TODO
+		// Reseto zero flag
+	}
+}
+
+func (gbcpu *GBCPU) SUBn() {
+	operand := gbcpu.getOperands(1)
+	result := gbcpu.Regs.a - operand[0]
+	gbcpu.Regs.a = result
 }
 
 func (gbcpu *GBCPU) SUBr(reg *byte) {
@@ -151,13 +300,40 @@ func (gbcpu *GBCPU) SUBaa(a1, a2 *byte) {
 }
 
 func (gbcpu *GBCPU) SBCrr(reg1, reg2 *byte) {
-	result := *reg1 - *reg2 - (gbcpu.Regs.f & (1 << 4))
+	result := *reg1 - *reg2 - ((gbcpu.Regs.f >> 4) & 1)
 	*reg1 = result
+}
+
+func (gbcpu *GBCPU) SBCrn(reg *byte) {
+	operands := gbcpu.getOperands(1)
+	result := *reg - operands[0] - ((gbcpu.Regs.f >> 4) & 1)
+	*reg = result
 }
 
 func (gbcpu *GBCPU) SBCraa(reg, a1, a2 *byte) {
 	val := gbcpu.getValCartAddr(a1, a2, 1)
 	*reg = *reg - val[0]
+}
+
+// Subtraction from accumulator that doesn't update it
+// Only updates flags
+func (gbcpu *GBCPU) CPr(reg *byte) {
+	// TODO
+}
+
+func (gbcpu *GBCPU) CPn() {
+	// TODO
+}
+
+func (gbcpu *GBCPU) CPaa(a1, a2 *byte) {
+	// TODO
+}
+
+// PUSHRR copies reg1reg2 into SP
+// Increments SP by 2
+func (gbcpu *GBCPU) PUSHrr(reg1, reg2 *byte) {
+	gbcpu.Regs.sp = []byte{*reg1, *reg2}
+	gbcpu.Regs.incrementSP(2)
 }
 
 // a1, s2 are 8-bit components of a 16-bit address
@@ -169,8 +345,34 @@ func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
 
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
 	addr := gbcpu.sliceToInt([]byte{*a1, *a2})
-	
+
 	GbMMU.Cart.MBC[addr] = *reg
+}
+
+func (gbcpu *GBCPU) LDnnr(reg *byte) {
+	operands := gbcpu.getOperands(2)
+	addr := gbcpu.sliceToInt(operands)
+	GbMMU.Cart.MBC[addr] = *reg
+}
+
+func (gbcpu *GBCPU) LDrnn(reg *byte) {
+	operands := gbcpu.getOperands(2)
+	addr := gbcpu.sliceToInt(operands)
+	*reg = GbMMU.Cart.MBC[addr]
+}
+
+// LDffrr sets value at (0xFF00+reg1) to reg2
+func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
+	GbMMU.Cart.MBC[0xFF00+uint16(*reg1)] = *reg2
+}
+
+func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
+	*reg1 = GbMMU.Cart.MBC[0xFF00+uint16(*reg2)]
+}
+
+func (gbcpu *GBCPU) LDrffn(reg *byte) {
+	operand := gbcpu.getOperands(1)
+	*reg = GbMMU.Cart.MBC[0xFF0+uint16(operand[0])]
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
@@ -200,6 +402,74 @@ func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
 func (gbcpu *GBCPU) JPaa() {
 	jmpAddr := gbcpu.getOperands(2)
 	gbcpu.Regs.PC = jmpAddr
+}
+
+func (gbcpu *GBCPU) JPrr(reg1, reg2 *byte) {
+	gbcpu.Regs.PC = []byte{*reg1, *reg2}
+}
+
+func (gbcpu *GBCPU) JPZaa() {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z != 0 {
+		gbcpu.JPaa()
+	}
+}
+
+func (gbcpu *GBCPU) JPNZaa() {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z == 0 {
+		gbcpu.JPaa()
+	}
+}
+
+func (gbcpu *GBCPU) JPCaa() {
+	c := ((gbcpu.Regs.f >> 4) & 1)
+	if c != 0 {
+		gbcpu.JPaa()
+	}
+}
+
+func (gbcpu *GBCPU) JPNCaa() {
+	c := ((gbcpu.Regs.f >> 4) & 1)
+	if c == 0 {
+		gbcpu.JPaa()
+	}
+}
+
+func (gbcpu *GBCPU) CALLaa() {
+	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
+	begin := nextInstr + 1
+	end := nextInstr + 3
+	gbcpu.Regs.sp = GbMMU.Cart.MBC[begin:end]
+	gbcpu.Regs.PC = gbcpu.getOperands(2)
+}
+
+func (gbcpu *GBCPU) CALLZaa() {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z != 0 {
+		gbcpu.CALLaa()
+	}
+}
+
+func (gbcpu *GBCPU) CALLNZaa() {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z == 0 {
+		gbcpu.CALLaa()
+	}
+}
+
+func (gbcpu *GBCPU) CALLCaa() {
+	c := ((gbcpu.Regs.f >> 4) & 1)
+	if c != 0 {
+		gbcpu.CALLaa()
+	}
+}
+
+func (gbcpu *GBCPU) CALLNCaa() {
+	c := ((gbcpu.Regs.f >> 4) & 1)
+	if c == 0 {
+		gbcpu.CALLaa()
+	}
 }
 
 // Add byte at PC + 1 to PC, and set PC to that value
@@ -235,7 +505,7 @@ func (gbcpu *GBCPU) DAA() {
 	// Reference: http://forums.nesdev.com/viewtopic.php?t=9088
 }
 
-func  (gbcpu *GBCPU) SCF() {
+func (gbcpu *GBCPU) SCF() {
 	// TODO
 	// Set carry flag
 }
@@ -245,6 +515,65 @@ func (gbcpu *GBCPU) CPL() {
 	gbcpu.Regs.a = ^gbcpu.Regs.a
 }
 
+// RET pops the top of the stack into the program counter
+func (gbcpu *GBCPU) RET() {
+	gbcpu.Regs.PC = gbcpu.Regs.sp
+	gbcpu.Regs.incrementSP(1)
+}
+
+func (gbcpu *GBCPU) RETI() {
+	gbcpu.RET()
+	// TODO Set flag for interrupts enabled
+}
+
+func (gbcpu *GBCPU) RETZ() {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z != 0 {
+		gbcpu.RET()
+	}
+}
+
+func (gbcpu *GBCPU) RETC() {
+	c := ((gbcpu.Regs.f >> 4) & 1)
+	if c != 0 {
+		gbcpu.RET()
+	}
+}
+
+func (gbcpu *GBCPU) RETNC() {
+	c := ((gbcpu.Regs.f >> 4) & 1)
+	if c == 0 {
+		gbcpu.RET()
+	}
+}
+
+// RETNZ pops the top of the stack into the program counter
+// if Z is not set
+func (gbcpu *GBCPU) RETNZ() {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z == 0 {
+		gbcpu.RET()
+	}
+}
+
+// POPrr pops 2 bytes from SP into operand
+// Increments SP by 2
+func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
+	*reg1 = gbcpu.Regs.sp[0]
+	*reg2 = gbcpu.Regs.sp[1]
+	gbcpu.Regs.incrementSP(2)
+}
+
+func (gbcpu *GBCPU) EI() {
+	// TODO
+	// Enables interrupts
+}
+
+func (gbcpu *GBCPU) DI() {
+	// TODO
+	// Disables interrupts
+}
+
 func (gbcpu *GBCPU) sliceToInt(slice []byte) uint16 {
 	return binary.LittleEndian.Uint16(slice)
 }
@@ -252,7 +581,7 @@ func (gbcpu *GBCPU) sliceToInt(slice []byte) uint16 {
 func (gbcpu *GBCPU) getOperands(number uint16) []byte {
 	begin := gbcpu.sliceToInt(gbcpu.Regs.PC) + 1
 	end := gbcpu.sliceToInt(gbcpu.Regs.PC) + (1 + number)
-	
+
 	return GbMMU.Cart.MBC[begin:end]
 }
 
