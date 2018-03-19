@@ -274,7 +274,7 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0xF6: Instruction{"OR i8", 8, 1, func() { gbcpu.ORn() }},
 		0xF7: Instruction{"RST 30", 16, 0, func() { gbcpu.RST(0x30) }},
 		0xF8: Instruction{"LD HL,SP+s8", 12, 1, func() { gbcpu.LDrrSPs(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
-		0xF9: Instruction{"LD SP,HL", 8, 0, func() { gbcpu.LDSPrr(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
+		0xF9: Instruction{"LD SP,HL", 8, 0, func() { gbcpu.LDSPHL(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
 		0xFA: Instruction{"LD A,(a16)", 16, 2, func() { gbcpu.LDrnn(&gbcpu.Regs.a) }},
 		0xFB: Instruction{"EI", 4, 0, func() { gbcpu.EI() }},
 		// 0xFC: no corresponding instruction

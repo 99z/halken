@@ -8,6 +8,10 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
 
 ## TODO
 
-1. Implement CPU opcodes
+1. ~Implement CPU opcodes~
+    * Non-CB opcodes implemented
+        * Need to do second pass with comments, verify logic
+        * Write dispatch loop
+            * Don't need to have clock cycles, PC increments in actual instructions, can just put in dispatch loop and use struct fields
 2. Implement memory
 3. Test GB bootstrap ROM

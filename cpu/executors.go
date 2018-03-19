@@ -10,28 +10,66 @@ import (
 // Prevents having to set MMU pointer as a field on the CPU struct
 var GbMMU *mmu.GBMMU
 
+// LDrr -> e.g. LD A,B
+// Loads value in one register to another
 func (gbcpu *GBCPU) LDrr(to, from *byte) {
 	*to = *from
 }
 
+// LDrrnn -> e.g. LD BC,i16
+// Loads 2 8-bit immediate operands into register pair
 func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 	operands := gbcpu.getOperands(2)
-
 	gbcpu.Regs.writePair(reg1, reg2, operands)
 }
 
-func (gbcpu *GBCPU) LDSPrr(reg1, reg2 *byte) {
+// LDSPHL -> e.g. LD SP,HL
+// Loads bytes from register pair HL into SP
+func (gbcpu *GBCPU) LDSPHL(reg1, reg2 *byte) {
 	gbcpu.Regs.sp = []byte{*reg1, *reg2}
 }
 
+// LDrrSPs -> e.g. LD BC,SP+s8
+// Loads value of SP + signed 8-bit value into register pair
 func (gbcpu *GBCPU) LDrrSPs(reg1, reg2 *byte) {
 	operand := gbcpu.getOperands(1)
+	// Get SP as a 16-bit int, add operand to it
 	val := gbcpu.sliceToInt(gbcpu.Regs.sp) + uint16(operand[0])
-	bytes := make([]byte, 2)
-	binary.LittleEndian.PutUint16(bytes, val)
-	gbcpu.Regs.sp = bytes
+	gbcpu.Regs.writePairFromInt(reg1, reg2, val)
+
+	// HC and C are a little weird for this instruction
+	// https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
+	if val >= 0 {
+		newHC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xFF) + uint16(operand[0])) > 0xFF
+		var newHCVal uint8
+		if newHC {
+			newHCVal = 1
+		}
+		newC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xF) + (uint16(operand[0]) & 0xF)) > 0xF
+		var newCVal uint8
+		if newC {
+			newCVal = 1
+		}
+		gbcpu.Regs.f |= (newHCVal << 4)
+		gbcpu.Regs.f |= (newCVal << 5)
+	} else {
+		newHC := (val & 0xFF) <= (gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xFF)
+		var newHCVal uint8
+		if newHC {
+			newHCVal = 1
+		}
+		newC := (val & 0xF) <= (gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xF)
+		var newCVal uint8
+		if newC {
+			newCVal = 1
+		}
+		gbcpu.Regs.f |= (newHCVal << 4)
+		gbcpu.Regs.f |= (newCVal << 5)
+	}
 }
 
+// LDrn -> e.g. LD B,i8
+// Loads 1 8-bit immediate operand into a register
 func (gbcpu *GBCPU) LDrn(reg *byte) {
 	operand := gbcpu.getOperands(1)
 	*reg = operand[0]

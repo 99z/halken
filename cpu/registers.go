@@ -24,9 +24,19 @@ type Registers struct {
 	PC []byte
 }
 
+// writePair writes 2 bytes to a register pair
+// Order is swapped because the Game Boy is Little Endian
 func (regs *Registers) writePair(reg1, reg2 *byte, data []byte) {
 	*reg1 = data[1]
 	*reg2 = data[0]
+}
+
+// writePairFromInt writes a 16-bit integer to a register pair
+func (regs *Registers) writePairFromInt(reg1, reg2 *byte, data uint16) {
+	splitInt := make([]byte, 2)
+	binary.LittleEndian.PutUint16(splitInt, data)
+	*reg1 = splitInt[1]
+	*reg2 = splitInt[0]
 }
 
 func (regs *Registers) readPair(reg1, reg2 *byte) [2]byte {
