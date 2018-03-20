@@ -4,10 +4,17 @@ import (
 	"encoding/binary"
 )
 
-// 8 bit registers
+// Registers represents LR35902 register
+// Notes:
+// Carry flag - https://stackoverflow.com/questions/31409444/what-is-the-behavior-of-the-carry-flag-for-cp-on-a-game-boy
+// Half carry flag - http://stackoverflow.com/questions/8868396/gbz80-what-constitutes-a-half-carry/8874607#8874607
+// Zero flag - set if result was zero
 type Registers struct {
 	a byte // Accumulator
-	f byte // Flags
+	// Flags
+	// ZNHC 0000
+	// Z = zero, N = subtract, H = half carry, C = carry
+	f byte
 
 	b byte
 	c byte
@@ -55,4 +62,24 @@ func (regs *Registers) incrementPC(amt uint16) {
 	pcInt := binary.LittleEndian.Uint16(regs.PC)
 	pcInt += amt
 	binary.LittleEndian.PutUint16(regs.PC, pcInt)
+}
+
+func (regs *Registers) setZero(val byte) {
+	regs.f |= (val << 7)
+}
+
+func (regs *Registers) setSubtract(val byte) {
+	regs.f |= (val << 6)
+}
+
+func (regs *Registers) setHalfCarry(val byte) {
+	regs.f |= (val << 5)
+}
+
+func (regs *Registers) setCarry(val byte) {
+	regs.f |= (val << 4)
+}
+
+func (regs *Registers) getCarry() byte {
+	return (regs.f >> 4) & 1
 }

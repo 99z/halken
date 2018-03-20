@@ -84,8 +84,31 @@ func (gbcpu *GBCPU) INCrr(reg1, reg2 *byte) {
 	*reg2++
 }
 
+// INCr -> e.g. INC B
+// Adds 1 to register, sets new value
+// Flags: Z0H-
 func (gbcpu *GBCPU) INCr(reg *byte) {
 	*reg++
+	sum := (*reg & 0xf) + (1 & 0xf)
+
+	// Check for zero
+	if sum == 0x0 {
+		gbcpu.Regs.f |= (1 << 7)
+	} else {
+		gbcpu.Regs.f |= (0 << 7)
+	}
+
+	// Check for half carry
+	if sum&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.f |= (1 << 5)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.f |= (0 << 5)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.f |= (0 << 6)
 }
 
 // Increment value at memory location reg1reg2
@@ -126,8 +149,31 @@ func (gbcpu *GBCPU) INCrn(reg *byte) {
 	*reg = operand[0]
 }
 
+// DECr -> e.g. DEC B
+// Subtracts 1 from register, sets new value
+// Flags: Z1H-
 func (gbcpu *GBCPU) DECr(reg *byte) {
 	*reg--
+	sub := (*reg & 0xf) - (1 & 0xf)
+
+	// Check for zero
+	if sub == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for half carry
+	if sub&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag
+	gbcpu.Regs.setSubtract(1)
 }
 
 func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
@@ -135,20 +181,87 @@ func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
 	*reg2--
 }
 
+// RLCA performs 8-bit rotation to the left
+// Rotated bit is copied to carry
+// Flags: 000C
+// GB opcodes list show Z being set to zero, but other sources disagree
+// Z80 does not modify Z, other emulator sources do
+// Reference: https://hax.iimarckus.org/topic/1617/
 func (gbcpu *GBCPU) RLCA() {
-	gbcpu.Regs.a = gbcpu.Regs.a << 8
+	carry := gbcpu.Regs.a << 1
+	gbcpu.Regs.setCarry(carry)
+	gbcpu.Regs.a = (carry | carry>>7)
+
+	if carry != 0x0 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(0)
+	gbcpu.Regs.setZero(0)
 }
 
+// RLA rotates register A left through CF
+// Store old 0th bit into carry
+// Old carry becomes new 7th bit
+// Flags: 000C
 func (gbcpu *GBCPU) RLA() {
-	gbcpu.Regs.a = gbcpu.Regs.a << 9
+	carry := (gbcpu.Regs.a >> 7)
+	oldCarry := gbcpu.Regs.getCarry()
+	gbcpu.Regs.a = ((gbcpu.Regs.a << 1) | oldCarry)
+
+	if carry != 0x0 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(0)
+	gbcpu.Regs.setZero(0)
 }
 
+// RRCA performs 8-bit rotation to the right
+// Rotated bit is copied to carry
+// Flags: 000C
+// GB opcodes list show Z being set to zero, but other sources disagree
+// Z80 does not modify Z, other emulator sources do
 func (gbcpu *GBCPU) RRCA() {
-	gbcpu.Regs.a = gbcpu.Regs.a >> 8
+	carry := gbcpu.Regs.a >> 1
+	gbcpu.Regs.setCarry(carry)
+	gbcpu.Regs.a = (carry | carry<<7)
+
+	if carry != 0x0 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(0)
+	gbcpu.Regs.setZero(0)
 }
 
+// RRA rotates register A right through CF
+// Store old 0th bit into carry
+// Old carry becomes new 7th bit
+// Flags: 000C
 func (gbcpu *GBCPU) RRA() {
-	gbcpu.Regs.a = gbcpu.Regs.a >> 9
+	carry := (gbcpu.Regs.a << 7)
+	oldCarry := gbcpu.Regs.getCarry()
+	gbcpu.Regs.a = ((gbcpu.Regs.a >> 1) | oldCarry)
+
+	if carry != 0x0 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(0)
+	gbcpu.Regs.setZero(0)
 }
 
 // RST pushes current PC + 3 onto stack
@@ -203,9 +316,35 @@ func (gbcpu *GBCPU) ADDraa(reg, a1, a2 *byte) {
 	*reg = *reg + val[0]
 }
 
-func (gbcpu *GBCPU) ADDrrrr(left1, left2, right1, right2 *byte) {
-	*left1 = *right1
-	*left2 = *right2
+// ADDHLrr -> e.g. ADD HL,BC
+// Values of HL and reg1reg2 are added together
+// Result is written into HL
+// Flags: -0HC
+// TODO Double-check this carry calculation
+func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
+	hlInt := gbcpu.sliceToInt([]byte{gbcpu.Regs.h, gbcpu.Regs.l})
+	rrInt := gbcpu.sliceToInt([]byte{*reg1, *reg2})
+	sum := rrInt + hlInt
+
+	newH := gbcpu.Regs.h + *reg1
+	newL := gbcpu.Regs.l + *reg2
+	gbcpu.Regs.writePair(&gbcpu.Regs.h, &gbcpu.Regs.l, []byte{newH, newL})
+
+	// Check for half carry
+	if sum&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Check for carry
+	if sum > 65535 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
 }
 
 func (gbcpu *GBCPU) ADDSPs() {
