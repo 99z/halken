@@ -322,15 +322,81 @@ func (gbcpu *GBCPU) ADDrr(reg1, reg2 *byte) {
 	gbcpu.Regs.setSubtract(0)
 }
 
+// ADDrn -> e.g. ADD A,i8
+// Values of reg and i8 are added together
+// Result is written into reg
+// Flags: Z0HC
+// TODO Double-check this carry calculation
 func (gbcpu *GBCPU) ADDrn(reg *byte) {
 	operands := gbcpu.getOperands(1)
 	*reg = *reg + operands[0]
+
+	sum := (*reg & 0xf) + (operands[0] & 0xf)
+
+	// Check for zero
+	if sum == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for carry
+	if sum > 255 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	// Check for half carry
+	if sum&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.setSubtract(0)
 }
 
+// ADCrn -> e.g. ADC A,i8
+// Values of reg and i8 are added together
+// Result is written into reg1
+// Flags: Z0HC
+// TODO Double-check this carry calculation
 func (gbcpu *GBCPU) ADCrn(reg *byte) {
 	operands := gbcpu.getOperands(1)
 	result := *reg + operands[0] + ((gbcpu.Regs.f >> 4) & 1)
 	*reg = result
+
+	sum := (*reg & 0xf) + (operands[0] & 0xf) + ((gbcpu.Regs.f >> 4) & 1)
+
+	// Check for zero
+	if sum == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for carry
+	if sum > 255 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	// Check for half carry
+	if sum&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.setSubtract(0)
 }
 
 // ADCrr -> e.g. ADC A,B
@@ -412,10 +478,33 @@ func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
 	}
 }
 
+// ADDSPs -> e.g. ADD SP,s8
+// Adds 8-bit value to SP
+// Sets SP to new value
+// Flags: 00HC
 func (gbcpu *GBCPU) ADDSPs() {
 	operands := gbcpu.getOperands(1)
 	val := uint16(operands[0]) + gbcpu.sliceToInt(gbcpu.Regs.sp)
 	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, val)
+
+	// Check for half carry
+	if val&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Check for carry
+	if val > 65535 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	gbcpu.Regs.setZero(0)
+	gbcpu.Regs.setSubtract(0)
 }
 
 func (gbcpu *GBCPU) ADDrrSP(reg1, reg2 *byte) {
@@ -441,16 +530,24 @@ func (gbcpu *GBCPU) ANDr(reg *byte) {
 	gbcpu.Regs.setCarry(0)
 }
 
+// ANDn -> e.g. AND i8
+// Bitwise AND of i8 into A
+// Flags: Z010
 func (gbcpu *GBCPU) ANDn() {
 	operands := gbcpu.getOperands(1)
 	gbcpu.Regs.a &= operands[0]
+
+	// Check for zero
 	if gbcpu.Regs.a == 0x00 {
-		// TODO
-		// Set zero flag
+		gbcpu.Regs.setZero(1)
 	} else {
-		// TODO
-		// Reset zero flag
+		gbcpu.Regs.setZero(0)
 	}
+
+	// Set flags
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(1)
+	gbcpu.Regs.setCarry(0)
 }
 
 func (gbcpu *GBCPU) ANDaa(a1, a2 *byte) {
@@ -484,16 +581,24 @@ func (gbcpu *GBCPU) ORr(reg *byte) {
 	gbcpu.Regs.setCarry(0)
 }
 
+// ORn -> e.g. OR i8
+// Bitwise OR of i8 into A
+// Flags: Z000
 func (gbcpu *GBCPU) ORn() {
 	operand := gbcpu.getOperands(1)
 	gbcpu.Regs.a |= operand[0]
+
+	// Check for zero
 	if gbcpu.Regs.a == 0x00 {
-		// TODO
-		// Set zero flag
+		gbcpu.Regs.setZero(1)
 	} else {
-		// TODO
-		// Reset zero flag
+		gbcpu.Regs.setZero(0)
 	}
+
+	// Set flags
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(0)
+	gbcpu.Regs.setCarry(0)
 }
 
 func (gbcpu *GBCPU) ORaa(a1, a2 *byte) {
@@ -527,16 +632,24 @@ func (gbcpu *GBCPU) XORr(reg *byte) {
 	gbcpu.Regs.setCarry(0)
 }
 
+// XORn -> e.g. XOR i8
+// Bitwise XOR of i8 into A
+// Flags: Z000
 func (gbcpu *GBCPU) XORn() {
 	operand := gbcpu.getOperands(1)
 	gbcpu.Regs.a ^= operand[0]
-	if gbcpu.Regs.a == 0 {
-		// TODO
-		// Set zero flag
+
+	// Check for zero
+	if gbcpu.Regs.a == 0x00 {
+		gbcpu.Regs.setZero(1)
 	} else {
-		// TODO
-		// Reset zero flag
+		gbcpu.Regs.setZero(0)
 	}
+
+	// Set flags
+	gbcpu.Regs.setSubtract(0)
+	gbcpu.Regs.setHalfCarry(0)
+	gbcpu.Regs.setCarry(0)
 }
 
 func (gbcpu *GBCPU) XORaa(a1, a2 *byte) {
@@ -551,10 +664,42 @@ func (gbcpu *GBCPU) XORaa(a1, a2 *byte) {
 	}
 }
 
+// SUBn -> e.g. SUB i8
+// Value of i8 is subtracted from A
+// Result is written into reg
+// Flags: Z1HC
+// TODO Double-check this carry calculation
 func (gbcpu *GBCPU) SUBn() {
 	operand := gbcpu.getOperands(1)
 	result := gbcpu.Regs.a - operand[0]
+	sub := (gbcpu.Regs.a & 0xf) - (operand[0] & 0xf)
 	gbcpu.Regs.a = result
+
+	// Check for zero
+	if sub == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for carry
+	if sub > 255 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	// Check for half carry
+	if sub&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.setSubtract(1)
 }
 
 // SUBr -> e.g. SUB B
@@ -637,10 +782,44 @@ func (gbcpu *GBCPU) SBCrr(reg1, reg2 *byte) {
 	gbcpu.Regs.setSubtract(1)
 }
 
+// SBCrn -> e.g. SBC A,i8
+// Sum of i8 and carry flag is subtracted from reg
+// Result is written into reg
+// Flags: Z1HC
+// TODO Double-check this carry calculation
 func (gbcpu *GBCPU) SBCrn(reg *byte) {
 	operands := gbcpu.getOperands(1)
-	result := *reg - operands[0] - ((gbcpu.Regs.f >> 4) & 1)
+	sum := operands[0] + ((gbcpu.Regs.f >> 4) & 1)
+	result := *reg - sum
 	*reg = result
+
+	sub := (*reg & 0xf) - (sum & 0xf)
+
+	// Check for zero
+	if sub == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for carry
+	if sub > 255 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	// Check for half carry
+	if sub&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.setSubtract(1)
 }
 
 func (gbcpu *GBCPU) SBCraa(reg, a1, a2 *byte) {
@@ -682,8 +861,39 @@ func (gbcpu *GBCPU) CPr(reg *byte) {
 	gbcpu.Regs.setSubtract(1)
 }
 
+// CPn -> e.g. CP i8
+// Subtraction from accumulator that doesn't update it
+// Only updates flags
+// Flags: Z1HC
 func (gbcpu *GBCPU) CPn() {
-	// TODO
+	operands := gbcpu.getOperands(1)
+	sub := (gbcpu.Regs.a & 0xf) - (operands[0] & 0xf)
+
+	// Check for zero
+	if sub == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for carry
+	if sub > 255 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	// Check for half carry
+	if sub&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.setSubtract(1)
 }
 
 func (gbcpu *GBCPU) CPaa(a1, a2 *byte) {
@@ -919,10 +1129,39 @@ func (gbcpu *GBCPU) RETNZ() {
 
 // POPrr pops 2 bytes from SP into operand
 // Increments SP by 2
+// Flags: ZNHC
 func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 	*reg1 = gbcpu.Regs.sp[0]
 	*reg2 = gbcpu.Regs.sp[1]
 	gbcpu.Regs.incrementSP(2)
+
+	spInt := gbcpu.sliceToInt(gbcpu.Regs.sp)
+
+	// Check for zero
+	if spInt == 0x0 {
+		gbcpu.Regs.setZero(1)
+	} else {
+		gbcpu.Regs.setZero(0)
+	}
+
+	// Check for carry
+	if spInt > 255 {
+		gbcpu.Regs.setCarry(1)
+	} else {
+		gbcpu.Regs.setCarry(0)
+	}
+
+	// Check for half carry
+	if spInt&0x10 == 0x10 {
+		// Half-carry occurred
+		gbcpu.Regs.setHalfCarry(1)
+	} else {
+		// Half-carry did not occur
+		gbcpu.Regs.setHalfCarry(0)
+	}
+
+	// Set subtract flag to zero
+	gbcpu.Regs.setSubtract(1)
 }
 
 func (gbcpu *GBCPU) EI() {
