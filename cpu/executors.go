@@ -952,7 +952,7 @@ func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
 }
 
 func (gbcpu *GBCPU) LDDaaR(a1, a2, reg *byte) {
-	GbMMU.Cart.MBC[binary.LittleEndian.Uint16([]byte{*a1, *a2})] = *reg
+	GbMMU.WriteByte([]byte{*a1, *a2}, *reg)
 	*reg--
 }
 
@@ -973,6 +973,7 @@ func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
 func (gbcpu *GBCPU) JPaa() {
 	jmpAddr := gbcpu.getOperands(2)
 	gbcpu.Regs.PC = jmpAddr
+	gbcpu.Jumped = true
 }
 
 func (gbcpu *GBCPU) JPrr(reg1, reg2 *byte) {

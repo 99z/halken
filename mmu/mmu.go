@@ -1,25 +1,32 @@
 package mmu
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
+
 	"../cartcon"
 )
 
 // Reference http://gameboy.mongenel.com/dmg/asmmemmap.html
 type GBMMU struct {
 	// Bootstrap ROM
-	bios	[256]byte
-	Cart	cartcon.Cartridge
+	bios [256]byte
+	Cart cartcon.Cartridge
 	// Bank 0 not switchable in DMG and CGB
 	// For CGB, bank 1 is switchable
-	ram		[2][4096]byte
+	ram [2][4096]byte
 	// Reserved
-	echoram	[7680]byte
+	echoram [7680]byte
 }
 
 func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.bios = BootstrapROM
+}
+
+func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
+	memLoc := binary.LittleEndian.Uint16(addr) & 0x0FFF
+	gbmmu.ram[1][memLoc] = data
 }
 
 // Reads cartridge ROM into memory
@@ -29,7 +36,7 @@ func (gbmmu *GBMMU) LoadCart(path string) error {
 	if err != nil {
 		return fmt.Errorf("MMU: loadCart(%s) failed: %s", path, err)
 	}
-	
+
 	// Cartridge header layout
 	// http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
 	cart := new(cartcon.Cartridge)
@@ -39,7 +46,7 @@ func (gbmmu *GBMMU) LoadCart(path string) error {
 	cart.Type = int(cart.MBC[0x0147])
 	cart.ROMSize = int(cart.MBC[0x0148])
 	cart.RAMSize = int(cart.MBC[0x0149])
-	
+
 	gbmmu.Cart = *cart
 	return nil
 }

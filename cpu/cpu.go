@@ -14,6 +14,7 @@ type GBCPU struct {
 	tCycles int
 	Regs    *Registers
 	Instrs  map[byte]Instruction
+	Jumped  bool
 }
 
 // InitCPU initializes a new CPU struct
