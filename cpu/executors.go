@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"../mmu"
 )
@@ -934,7 +935,9 @@ func (gbcpu *GBCPU) LDrnn(reg *byte) {
 
 // LDffrr sets value at (0xFF00+reg1) to reg2
 func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
-	GbMMU.Cart.MBC[0xFF00+uint16(*reg1)] = *reg2
+	addr := make([]byte, 2)
+	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(*reg1))
+	GbMMU.WriteByte(addr, *reg2)
 }
 
 func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
@@ -959,14 +962,14 @@ func (gbcpu *GBCPU) LDDaaR(a1, a2, reg *byte) {
 // Set value at address a1a2 to value in reg
 // Increment reg
 func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
-	GbMMU.Cart.MBC[binary.LittleEndian.Uint16([]byte{*a1, *a2})] = *reg
+	GbMMU.WriteByte([]byte{*a1, *a2}, *reg)
 	*reg++
 }
 
-// Set value in reg to  value at address a1a2
+// Set value in reg to value at address a1a2
 // Increment reg
 func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
-	*reg = GbMMU.Cart.MBC[binary.LittleEndian.Uint16([]byte{*a1, *a2})]
+	*reg = GbMMU.ReadByte([]byte{*a1, *a2})
 	*reg++
 }
 
@@ -1008,12 +1011,17 @@ func (gbcpu *GBCPU) JPNCaa() {
 	}
 }
 
+// CALLaa -> e.g. CALL $028B
+// Pushes the addr at PC+3 to the stack
+// Jumps to the address specified by next 2 bytes
 func (gbcpu *GBCPU) CALLaa() {
-	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
-	begin := nextInstr + 1
-	end := nextInstr + 3
-	gbcpu.Regs.sp = GbMMU.Cart.MBC[begin:end]
 	gbcpu.Regs.PC = gbcpu.getOperands(2)
+	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, gbcpu.sliceToInt(gbcpu.Regs.PC)+1)
+	// nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
+	// begin := nextInstr + 1
+	// end := nextInstr + 2
+	fmt.Println(gbcpu.Regs.sp)
+	gbcpu.Jumped = true
 }
 
 func (gbcpu *GBCPU) CALLZaa() {
@@ -1090,7 +1098,8 @@ func (gbcpu *GBCPU) CPL() {
 // RET pops the top of the stack into the program counter
 func (gbcpu *GBCPU) RET() {
 	gbcpu.Regs.PC = gbcpu.Regs.sp
-	gbcpu.Regs.incrementSP(1)
+	gbcpu.Regs.incrementSP(2)
+	gbcpu.Jumped = true
 }
 
 func (gbcpu *GBCPU) RETI() {
@@ -1184,6 +1193,7 @@ func (gbcpu *GBCPU) getOperands(number uint16) []byte {
 	end := gbcpu.sliceToInt(gbcpu.Regs.PC) + (1 + number)
 
 	return GbMMU.Cart.MBC[begin:end]
+	// return []byte{args[1], args[0]}
 }
 
 func (gbcpu *GBCPU) getValCartAddr(a1, a2 *byte, number uint16) []byte {

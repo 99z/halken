@@ -33,7 +33,7 @@ func main() {
 		GbCPU.Jumped = false
 		opcode := GbCPU.Regs.PC[:]
 		operation := GbMMU.Cart.MBC[binary.LittleEndian.Uint16(opcode)]
-		fmt.Printf("%02X\t%v\n", operation, GbCPU.Instrs[operation])
+		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 		GbCPU.Instrs[operation].Executor()
 
 		if GbCPU.Jumped {

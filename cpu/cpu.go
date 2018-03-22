@@ -32,3 +32,14 @@ func (gbcpu *GBCPU) readPC() {
 	// TODO
 	// Might need if decide not to export Regs
 }
+
+// func (gbcpu *GBCPU) pushByteToStack(data byte) {
+// 	gbcpu.Regs.decrementSP(1)
+// 	GbMMU.WriteByte(gbcpu.Regs.sp, data)
+// }
+
+// func (gbcpu *GBCPU) popByteFromStack() byte {
+// 	result := gbcpu.Regs.sp[0]
+// 	gbcpu.Regs.incrementSP(1)
+// 	return result
+// }

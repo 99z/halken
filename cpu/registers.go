@@ -58,6 +58,13 @@ func (regs *Registers) incrementSP(amt uint16) {
 	binary.LittleEndian.PutUint16(regs.sp, spInt)
 }
 
+func (regs *Registers) decrementSP(amt uint16) {
+	spInt := binary.LittleEndian.Uint16(regs.sp)
+	spInt--
+	newSP := make([]byte, 2)
+	binary.LittleEndian.PutUint16(newSP, spInt)
+}
+
 func (regs *Registers) incrementPC(amt uint16) {
 	pcInt := binary.LittleEndian.Uint16(regs.PC)
 	pcInt += amt
