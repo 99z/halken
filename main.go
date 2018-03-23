@@ -26,13 +26,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Title: %s\nCGBFlag: %v\nType: %v\nROM: %v\nRAM: %v\n",
-		GbMMU.Cart.Title, GbMMU.Cart.CGBFlag, GbMMU.Cart.Type, GbMMU.Cart.ROMSize, GbMMU.Cart.RAMSize)
+	// fmt.Printf("Title: %s\nCGBFlag: %v\nType: %v\nROM: %v\nRAM: %v\n",
+	// 	GbMMU.Cart.Title, GbMMU.Cart.CGBFlag, GbMMU.Cart.Type, GbMMU.Cart.ROMSize, GbMMU.Cart.RAMSize)
 
-	for {
+	for i := 0; i < 250; i++ {
 		GbCPU.Jumped = false
 		opcode := GbCPU.Regs.PC[:]
-		operation := GbMMU.Cart.MBC[binary.LittleEndian.Uint16(opcode)]
+		opcodeInt := binary.LittleEndian.Uint16(opcode)
+
+		operation := GbMMU.Memory[opcodeInt]
+
 		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 		GbCPU.Instrs[operation].Executor()
 

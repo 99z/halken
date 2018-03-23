@@ -22,6 +22,7 @@ func (gbcpu *GBCPU) LDrr(to, from *byte) {
 func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 	operands := gbcpu.getOperands(2)
 	gbcpu.Regs.writePair(reg1, reg2, operands)
+	fmt.Println(*reg1, *reg2)
 }
 
 // LDSPHL -> e.g. LD SP,HL
@@ -741,7 +742,7 @@ func (gbcpu *GBCPU) SUBr(reg *byte) {
 }
 
 func (gbcpu *GBCPU) SUBaa(a1, a2 *byte) {
-	GbMMU.Cart.MBC[gbcpu.sliceToInt([]byte{*a1, *a2})]--
+	GbMMU.Memory[gbcpu.sliceToInt([]byte{*a2, *a1})]--
 }
 
 // SBCrr -> e.g. SBC A,B
@@ -916,21 +917,22 @@ func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
 }
 
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
-	addr := gbcpu.sliceToInt([]byte{*a1, *a2})
+	addr := gbcpu.sliceToInt([]byte{*a2, *a1})
 
-	GbMMU.Cart.MBC[addr] = *reg
+	GbMMU.Memory[addr] = *reg
+	fmt.Println(*reg)
 }
 
 func (gbcpu *GBCPU) LDnnr(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	addr := gbcpu.sliceToInt(operands)
-	GbMMU.Cart.MBC[addr] = *reg
+	GbMMU.Memory[addr] = *reg
 }
 
 func (gbcpu *GBCPU) LDrnn(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	addr := gbcpu.sliceToInt(operands)
-	*reg = GbMMU.Cart.MBC[addr]
+	*reg = GbMMU.Memory[addr]
 }
 
 // LDffrr sets value at (0xFF00+reg1) to reg2
@@ -941,36 +943,36 @@ func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
 }
 
 func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
-	*reg1 = GbMMU.Cart.MBC[0xFF00+uint16(*reg2)]
+	*reg1 = GbMMU.Memory[0xFF00+uint16(*reg2)]
 }
 
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
 	operand := gbcpu.getOperands(1)
-	*reg = GbMMU.Cart.MBC[0xFF0+uint16(operand[0])]
+	*reg = GbMMU.Memory[0xFF0+uint16(operand[0])]
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
 	operand := gbcpu.getOperands(1)
-	gbcpu.Regs.writePair(reg1, reg2, []byte{operand[0], operand[0]})
+	GbMMU.Memory[gbcpu.sliceToInt([]byte{*reg1, *reg2})] = operand[0]
 }
 
 func (gbcpu *GBCPU) LDDaaR(a1, a2, reg *byte) {
-	GbMMU.WriteByte([]byte{*a1, *a2}, *reg)
+	GbMMU.Memory[gbcpu.sliceToInt([]byte{*a2, *a1})] = *reg
 	*reg--
 }
 
 // Set value at address a1a2 to value in reg
 // Increment reg
 func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
-	GbMMU.WriteByte([]byte{*a1, *a2}, *reg)
+	GbMMU.WriteByte([]byte{*a2, *a1}, *reg)
 	*reg++
 }
 
 // Set value in reg to value at address a1a2
 // Increment reg
 func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
-	*reg = GbMMU.ReadByte([]byte{*a1, *a2})
-	*reg++
+	*reg = GbMMU.ReadByte([]byte{*a2, *a1})
+	// *reg++
 }
 
 func (gbcpu *GBCPU) JPaa() {
@@ -1192,12 +1194,12 @@ func (gbcpu *GBCPU) getOperands(number uint16) []byte {
 	begin := gbcpu.sliceToInt(gbcpu.Regs.PC) + 1
 	end := gbcpu.sliceToInt(gbcpu.Regs.PC) + (1 + number)
 
-	return GbMMU.Cart.MBC[begin:end]
+	return GbMMU.Memory[begin:end]
 	// return []byte{args[1], args[0]}
 }
 
 func (gbcpu *GBCPU) getValCartAddr(a1, a2 *byte, number uint16) []byte {
-	begin := binary.LittleEndian.Uint16([]byte{*a1, *a2})
+	begin := binary.LittleEndian.Uint16([]byte{*a2, *a1})
 	end := begin + (number - 1)
-	return GbMMU.Cart.MBC[begin:end]
+	return GbMMU.Memory[begin:end]
 }
