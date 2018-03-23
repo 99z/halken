@@ -22,7 +22,6 @@ func (gbcpu *GBCPU) LDrr(to, from *byte) {
 func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 	operands := gbcpu.getOperands(2)
 	gbcpu.Regs.writePair(reg1, reg2, operands)
-	fmt.Println(*reg1, *reg2)
 }
 
 // LDSPHL -> e.g. LD SP,HL
@@ -91,26 +90,25 @@ func (gbcpu *GBCPU) INCrr(reg1, reg2 *byte) {
 // Flags: Z0H-
 func (gbcpu *GBCPU) INCr(reg *byte) {
 	*reg++
-	sum := (*reg & 0xf) + (1 & 0xf)
 
 	// Check for zero
-	if sum == 0x0 {
-		gbcpu.Regs.f |= (1 << 7)
+	if gbcpu.Regs.e == 0x0 {
+		gbcpu.Regs.setZero(1)
 	} else {
-		gbcpu.Regs.f |= (0 << 7)
+		gbcpu.Regs.setZero(0)
 	}
 
 	// Check for half carry
-	if sum&0x10 == 0x10 {
+	if gbcpu.Regs.e&0x10 == 0x10 {
 		// Half-carry occurred
-		gbcpu.Regs.f |= (1 << 5)
+		gbcpu.Regs.setHalfCarry(1)
 	} else {
 		// Half-carry did not occur
-		gbcpu.Regs.f |= (0 << 5)
+		gbcpu.Regs.setHalfCarry(0)
 	}
 
 	// Set subtract flag to zero
-	gbcpu.Regs.f |= (0 << 6)
+	gbcpu.Regs.setSubtract(0)
 }
 
 // Increment value at memory location reg1reg2
@@ -920,7 +918,6 @@ func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
 	addr := gbcpu.sliceToInt([]byte{*a2, *a1})
 
 	GbMMU.Memory[addr] = *reg
-	fmt.Println(*reg)
 }
 
 func (gbcpu *GBCPU) LDnnr(reg *byte) {
@@ -1066,7 +1063,12 @@ func (gbcpu *GBCPU) JRZn() {
 }
 
 func (gbcpu *GBCPU) JRNZn() {
-	// TODO
+	operand := gbcpu.getOperands(1)[0]
+	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + uint16(operand)) - 256
+
+	if gbcpu.Regs.getZero() != 1 {
+		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	}
 }
 
 func (gbcpu *GBCPU) JRCn() {

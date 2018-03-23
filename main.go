@@ -29,7 +29,7 @@ func main() {
 	// fmt.Printf("Title: %s\nCGBFlag: %v\nType: %v\nROM: %v\nRAM: %v\n",
 	// 	GbMMU.Cart.Title, GbMMU.Cart.CGBFlag, GbMMU.Cart.Type, GbMMU.Cart.ROMSize, GbMMU.Cart.RAMSize)
 
-	for i := 0; i < 250; i++ {
+	for {
 		GbCPU.Jumped = false
 		opcode := GbCPU.Regs.PC[:]
 		opcodeInt := binary.LittleEndian.Uint16(opcode)

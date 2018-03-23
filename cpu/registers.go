@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"encoding/binary"
+	"fmt"
 )
 
 // Registers represents LR35902 register
@@ -73,6 +74,11 @@ func (regs *Registers) incrementPC(amt uint16) {
 
 func (regs *Registers) setZero(val byte) {
 	regs.f |= (val << 7)
+	fmt.Printf("ZERO: %v\n", (regs.f>>7)&1)
+}
+
+func (regs *Registers) getZero() byte {
+	return (regs.f >> 7) & 1
 }
 
 func (regs *Registers) setSubtract(val byte) {
