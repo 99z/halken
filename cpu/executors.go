@@ -2,7 +2,6 @@ package cpu
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"../mmu"
 )
@@ -966,10 +965,10 @@ func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
 }
 
 // Set value in reg to value at address a1a2
-// Increment reg
+// Increment HL
 func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
 	*reg = GbMMU.ReadByte([]byte{*a2, *a1})
-	// *reg++
+	gbcpu.Regs.incrementHL(1)
 }
 
 func (gbcpu *GBCPU) JPaa() {
@@ -1019,7 +1018,6 @@ func (gbcpu *GBCPU) CALLaa() {
 	// nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
 	// begin := nextInstr + 1
 	// end := nextInstr + 2
-	fmt.Println(gbcpu.Regs.sp)
 	gbcpu.Jumped = true
 }
 

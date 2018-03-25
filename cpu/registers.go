@@ -2,7 +2,6 @@ package cpu
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 // Registers represents LR35902 register
@@ -51,6 +50,17 @@ func (regs *Registers) readPair(reg1, reg2 *byte) [2]byte {
 	return [2]byte{*reg1, *reg2}
 }
 
+func (regs *Registers) incrementHL(amt uint8) {
+	newL := regs.l + amt
+
+	if newL > 255 {
+		regs.l = 0
+		regs.h++
+	} else {
+		regs.l = newL
+	}
+}
+
 // incrementSP converts current SP to an integer,
 // increments it by 1, then stores it back as 2 bytes
 func (regs *Registers) incrementSP(amt uint16) {
@@ -74,7 +84,6 @@ func (regs *Registers) incrementPC(amt uint16) {
 
 func (regs *Registers) setZero(val byte) {
 	regs.f |= (val << 7)
-	fmt.Printf("ZERO: %v\n", (regs.f>>7)&1)
 }
 
 func (regs *Registers) getZero() byte {
