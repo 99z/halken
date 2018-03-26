@@ -2,6 +2,7 @@ package cpu
 
 import (
 	"encoding/binary"
+	"fmt"
 )
 
 // Registers represents LR35902 register
@@ -82,9 +83,8 @@ func (regs *Registers) incrementSP(amt uint16) {
 
 func (regs *Registers) decrementSP(amt uint16) {
 	spInt := binary.LittleEndian.Uint16(regs.sp)
-	spInt--
-	newSP := make([]byte, 2)
-	binary.LittleEndian.PutUint16(newSP, spInt)
+	spInt -= amt
+	binary.LittleEndian.PutUint16(regs.sp, spInt)
 }
 
 func (regs *Registers) incrementPC(amt uint16) {
@@ -135,4 +135,13 @@ func (regs *Registers) clearCarry() {
 
 func (regs *Registers) getCarry() byte {
 	return regs.f & (1 << 4)
+}
+
+func (regs *Registers) Dump() {
+	fmt.Printf("AF: %02X %02X\n", regs.a, regs.f)
+	fmt.Printf("BC: %02X %02X\n", regs.b, regs.c)
+	fmt.Printf("DE: %02X %02X\n", regs.d, regs.e)
+	fmt.Printf("HL: %02X %02X\n", regs.h, regs.l)
+	fmt.Printf("SP: %04X\n", regs.sp)
+	fmt.Printf("PC: %04X\n", regs.PC)
 }

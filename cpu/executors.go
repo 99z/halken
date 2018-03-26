@@ -899,11 +899,17 @@ func (gbcpu *GBCPU) CPaa(a1, a2 *byte) {
 	// TODO
 }
 
-// PUSHRR copies reg1reg2 into SP
+// PUSHRR
 // Increments SP by 2
+// Copies HL into addr (SP)
+// Looks like docs are wrong about this - I believe SP
+// needs to be incremented before the copy
 func (gbcpu *GBCPU) PUSHrr(reg1, reg2 *byte) {
-	gbcpu.Regs.sp = []byte{*reg1, *reg2}
-	gbcpu.Regs.incrementSP(2)
+	gbcpu.Regs.decrementSP(2)
+	addr := gbcpu.sliceToInt(gbcpu.Regs.sp)
+	GbMMU.Memory[addr] = *reg1
+	GbMMU.Memory[addr+1] = *reg2
+	gbcpu.Regs.Dump()
 }
 
 // a1, s2 are 8-bit components of a 16-bit address
@@ -940,6 +946,15 @@ func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
 
 func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
 	*reg1 = GbMMU.Memory[0xFF00+uint16(*reg2)]
+}
+
+func (gbcpu *GBCPU) LDffnr(reg *byte) {
+	operand := gbcpu.getOperands(1)
+	addr := make([]byte, 2)
+	// -1 here to not go OOB of the ROM
+	// TODO: is 0-indexing a problem in general?
+	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0])-1)
+	GbMMU.WriteByte(addr, *reg)
 }
 
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
@@ -1016,11 +1031,18 @@ func (gbcpu *GBCPU) JPNCaa() {
 // Pushes the addr at PC+3 to the stack
 // Jumps to the address specified by next 2 bytes
 func (gbcpu *GBCPU) CALLaa() {
+	gbcpu.Regs.decrementSP(2)
+	gbcpu.Regs.Dump()
+	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
+	nextInstrBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(nextInstrBytes, nextInstr)
+	fmt.Printf("b1: %02X, b2: %02X\n", nextInstrBytes[0], nextInstrBytes[1])
+	gbcpu.callStack = append(gbcpu.callStack, nextInstrBytes[0])
+	gbcpu.callStack = append(gbcpu.callStack, nextInstrBytes[1])
+	fmt.Println(gbcpu.callStack)
 	gbcpu.Regs.PC = gbcpu.getOperands(2)
-	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, gbcpu.sliceToInt(gbcpu.Regs.PC)+1)
-	// nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
-	// begin := nextInstr + 1
-	// end := nextInstr + 2
+	// binary.LittleEndian.PutUint16(gbcpu.Regs.sp, gbcpu.sliceToInt(gbcpu.Regs.PC)+1)
+
 	gbcpu.Jumped = true
 }
 
@@ -1103,7 +1125,10 @@ func (gbcpu *GBCPU) CPL() {
 
 // RET pops the top of the stack into the program counter
 func (gbcpu *GBCPU) RET() {
-	gbcpu.Regs.PC = gbcpu.Regs.sp
+	var b1, b2 byte
+	b1, gbcpu.callStack = gbcpu.callStack[len(gbcpu.callStack)-1], gbcpu.callStack[:len(gbcpu.callStack)-1]
+	b2, gbcpu.callStack = gbcpu.callStack[len(gbcpu.callStack)-1], gbcpu.callStack[:len(gbcpu.callStack)-1]
+	gbcpu.Regs.PC = []byte{b2, b1}
 	gbcpu.Regs.incrementSP(2)
 	gbcpu.Jumped = true
 }
@@ -1143,13 +1168,17 @@ func (gbcpu *GBCPU) RETNZ() {
 	}
 }
 
-// POPrr pops 2 bytes from SP into operand
+// POPrr copies 2 bytes at addr (SP) into the operand
 // Increments SP by 2
 // Flags: ZNHC
 func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
-	*reg1 = gbcpu.Regs.sp[0]
-	*reg2 = gbcpu.Regs.sp[1]
 	gbcpu.Regs.incrementSP(2)
+	addr := gbcpu.sliceToInt(gbcpu.Regs.sp)
+	fmt.Println(addr)
+	fmt.Println(GbMMU.Memory[addr])
+	*reg1 = GbMMU.Memory[addr]
+	*reg2 = GbMMU.Memory[addr+1]
+	gbcpu.Regs.Dump()
 
 	spInt := gbcpu.sliceToInt(gbcpu.Regs.sp)
 
