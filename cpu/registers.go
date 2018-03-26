@@ -31,6 +31,17 @@ type Registers struct {
 	PC []byte
 }
 
+// GB register initial values
+// http://bgb.bircd.org/pandocs.htm#powerupsequence
+func (regs *Registers) InitRegs() {
+	regs.writePair(&regs.a, &regs.f, []byte{0xB0, 0x01})
+	regs.writePair(&regs.b, &regs.c, []byte{0x13, 0x00})
+	regs.writePair(&regs.d, &regs.e, []byte{0xD8, 0x00})
+	regs.writePair(&regs.h, &regs.l, []byte{0x4D, 0x01})
+
+	regs.sp = []byte{0xFF, 0xFE}
+}
+
 // writePair writes 2 bytes to a register pair
 // Order is swapped because the Game Boy is Little Endian
 func (regs *Registers) writePair(reg1, reg2 *byte, data []byte) {
@@ -53,7 +64,7 @@ func (regs *Registers) readPair(reg1, reg2 *byte) [2]byte {
 func (regs *Registers) incrementHL(amt uint8) {
 	newL := regs.l + amt
 
-	if newL > 255 {
+	if newL == 0 {
 		regs.l = 0
 		regs.h++
 	} else {
@@ -82,26 +93,46 @@ func (regs *Registers) incrementPC(amt uint16) {
 	binary.LittleEndian.PutUint16(regs.PC, pcInt)
 }
 
-func (regs *Registers) setZero(val byte) {
-	regs.f |= (val << 7)
+func (regs *Registers) setZero() {
+	regs.f |= (1 << 7)
+}
+
+func (regs *Registers) clearZero() {
+	mask := ^(1 << 7)
+	regs.f &= byte(mask)
 }
 
 func (regs *Registers) getZero() byte {
-	return (regs.f >> 7) & 1
+	return regs.f & (1 << 7)
 }
 
-func (regs *Registers) setSubtract(val byte) {
-	regs.f |= (val << 6)
+func (regs *Registers) setSubtract() {
+	regs.f |= (1 << 6)
 }
 
-func (regs *Registers) setHalfCarry(val byte) {
-	regs.f |= (val << 5)
+func (regs *Registers) clearSubtract() {
+	mask := ^(1 << 6)
+	regs.f &= byte(mask)
 }
 
-func (regs *Registers) setCarry(val byte) {
-	regs.f |= (val << 4)
+func (regs *Registers) setHalfCarry() {
+	regs.f |= (1 << 5)
+}
+
+func (regs *Registers) clearHalfCarry() {
+	mask := ^(1 << 5)
+	regs.f &= byte(mask)
+}
+
+func (regs *Registers) setCarry() {
+	regs.f |= (1 << 4)
+}
+
+func (regs *Registers) clearCarry() {
+	mask := ^(1 << 4)
+	regs.f &= byte(mask)
 }
 
 func (regs *Registers) getCarry() byte {
-	return (regs.f >> 4) & 1
+	return regs.f & (1 << 4)
 }

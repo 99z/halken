@@ -22,6 +22,7 @@ type GBCPU struct {
 // Sets program counter to location
 func (gbcpu *GBCPU) InitCPU() {
 	gbcpu.Regs = new(Registers)
+	gbcpu.Regs.InitRegs()
 	// For now, start PC at usual jump destination after
 	// cartridge header information
 	gbcpu.Regs.PC = append(gbcpu.Regs.PC, 0x00, 0x01)
