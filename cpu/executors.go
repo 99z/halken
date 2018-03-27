@@ -962,10 +962,10 @@ func (gbcpu *GBCPU) LDffnr(reg *byte) {
 
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
 	operand := gbcpu.getOperands(1)
-	fmt.Printf("%v\n", operand[0])
 	addr := make([]byte, 2)
-	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0])-1)
+	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0]))
 	*reg = GbMMU.ReadByte(addr)
+	fmt.Println(GbMMU.ReadByte(addr))
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {

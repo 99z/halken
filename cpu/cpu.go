@@ -11,7 +11,7 @@ type GBCPU struct {
 	// Total machine cycles
 	mCycles int
 	// Total time cycles
-	tCycles int
+	TCycles uint16
 	Regs    *Registers
 	Instrs  map[byte]Instruction
 	Jumped  bool
