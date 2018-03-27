@@ -4,10 +4,6 @@
 // instructions contains all CPU instructions
 package cpu
 
-import (
-	"encoding/binary"
-)
-
 // GBCPU represents an instance of an LR35902
 // Reference: http://www.zilog.com/docs/z80/um0080.pdf
 // Page 80 discusses clocks
@@ -44,7 +40,7 @@ func (gbcpu *GBCPU) pushByteToStack(data byte) {
 }
 
 func (gbcpu *GBCPU) popByteFromStack() byte {
-	result := GbMMU.Memory[binary.LittleEndian.Uint16(gbcpu.Regs.sp)]
+	result := GbMMU.ReadByte(gbcpu.Regs.sp)
 	gbcpu.Regs.incrementSP(1)
 	return result
 }

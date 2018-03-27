@@ -73,6 +73,17 @@ func (regs *Registers) incrementHL(amt uint8) {
 	}
 }
 
+func (regs *Registers) incrementPair(reg1, reg2 *byte, amt uint8) {
+	newL := *reg2 + amt
+
+	if newL == 0 {
+		*reg2 = 0
+		*reg1++
+	} else {
+		*reg2 = newL
+	}
+}
+
 // incrementSP converts current SP to an integer,
 // increments it by 1, then stores it back as 2 bytes
 func (regs *Registers) incrementSP(amt uint16) {

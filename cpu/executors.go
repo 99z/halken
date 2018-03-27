@@ -83,8 +83,7 @@ func (gbcpu *GBCPU) LDrrr(reg1, reg2, op *byte) {
 }
 
 func (gbcpu *GBCPU) INCrr(reg1, reg2 *byte) {
-	*reg1++
-	*reg2++
+	gbcpu.Regs.incrementPair(reg1, reg2, 1)
 }
 
 // INCr -> e.g. INC B
@@ -867,7 +866,9 @@ func (gbcpu *GBCPU) CPr(reg *byte) {
 // Flags: Z1HC
 func (gbcpu *GBCPU) CPn() {
 	operands := gbcpu.getOperands(1)
-	sub := (gbcpu.Regs.a & 0xf) - (operands[0] & 0xf)
+	fmt.Printf("%02X\n", operands[0])
+	gbcpu.Regs.Dump()
+	sub := gbcpu.Regs.a - operands[0]
 
 	// Check for zero
 	if sub == 0x0 {
@@ -900,16 +901,15 @@ func (gbcpu *GBCPU) CPaa(a1, a2 *byte) {
 	// TODO
 }
 
-// PUSHRR
-// Increments SP by 2
+// PUSHrr
 // Copies HL into addr (SP)
 func (gbcpu *GBCPU) PUSHrr(reg1, reg2 *byte) {
-	gbcpu.Regs.decrementSP(2)
-	addr := gbcpu.sliceToInt(gbcpu.Regs.sp)
-	// gbcpu.pushByteToStack(*reg1)
-	// gbcpu.pushByteToStack(*reg2)
-	GbMMU.Memory[addr] = *reg1
-	GbMMU.Memory[addr+1] = *reg2
+	//gbcpu.Regs.decrementSP(2)
+	//addr := gbcpu.sliceToInt(gbcpu.Regs.sp)
+	// GbMMU.Memory[addr] = *reg1
+	// GbMMU.Memory[addr+1] = *reg2
+	gbcpu.pushByteToStack(*reg1)
+	gbcpu.pushByteToStack(*reg2)
 	gbcpu.Regs.Dump()
 	// fmt.Println(GbMMU.Memory[addr])
 	// fmt.Println(GbMMU.Memory[addr+1])
@@ -962,7 +962,10 @@ func (gbcpu *GBCPU) LDffnr(reg *byte) {
 
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
 	operand := gbcpu.getOperands(1)
-	*reg = GbMMU.Memory[0xFF0+uint16(operand[0])]
+	fmt.Printf("%v\n", operand[0])
+	addr := make([]byte, 2)
+	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0])-1)
+	*reg = GbMMU.ReadByte(addr)
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
@@ -1034,7 +1037,7 @@ func (gbcpu *GBCPU) JPNCaa() {
 // Pushes the addr at PC+3 to the stack
 // Jumps to the address specified by next 2 bytes
 func (gbcpu *GBCPU) CALLaa() {
-	// gbcpu.Regs.decrementSP(2)
+	gbcpu.Regs.Dump()
 	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
 	nextInstrBytes := make([]byte, 2)
 	binary.LittleEndian.PutUint16(nextInstrBytes, nextInstr)
@@ -1168,44 +1171,13 @@ func (gbcpu *GBCPU) RETNZ() {
 }
 
 // POPrr copies 2 bytes at addr (SP) into the operand
-// Increments SP by 2
 // Flags: ZNHC
 func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
-	addr := gbcpu.sliceToInt(gbcpu.Regs.sp)
-	fmt.Println(addr)
-	fmt.Println(GbMMU.Memory[addr])
-	*reg1 = GbMMU.Memory[addr]
-	*reg2 = GbMMU.Memory[addr+1]
+	b1 := gbcpu.popByteFromStack()
+	b2 := gbcpu.popByteFromStack()
+	*reg1 = b2
+	*reg2 = b1
 	gbcpu.Regs.Dump()
-	//gbcpu.Regs.incrementSP(2)
-
-	spInt := gbcpu.sliceToInt(gbcpu.Regs.sp)
-
-	// Check for zero
-	if spInt == 0x0 {
-		gbcpu.Regs.setZero()
-	} else {
-		gbcpu.Regs.clearZero()
-	}
-
-	// Check for carry
-	if spInt > 255 {
-		gbcpu.Regs.setCarry()
-	} else {
-		gbcpu.Regs.clearCarry()
-	}
-
-	// Check for half carry
-	if spInt&0x10 == 0x10 {
-		// Half-carry occurred
-		gbcpu.Regs.setHalfCarry()
-	} else {
-		// Half-carry did not occur
-		gbcpu.Regs.clearHalfCarry()
-	}
-
-	// Set subtract flag to zero
-	gbcpu.Regs.setSubtract()
 }
 
 func (gbcpu *GBCPU) EI() {
