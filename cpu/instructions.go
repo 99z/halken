@@ -249,8 +249,8 @@ func (gbcpu *GBCPU) loadInstructions() {
 		// 0xDD: no corresponding instruction
 		0xDE: Instruction{"SBC A,i8", 8, 2, func() { gbcpu.SBCrn(&gbcpu.Regs.a) }},
 		0xDF: Instruction{"RST 18H", 16, 1, func() { gbcpu.RST(0x18) }},
-		0xE0: Instruction{"LDH ($FF00+a8),A", 12, 2, func() {}},
-		0xE1: Instruction{"POP HL", 12, 1, func() {}},
+		0xE0: Instruction{"LD ($FF00+a8),A", 12, 2, func() { gbcpu.LDffnr(&gbcpu.Regs.a) }},
+		0xE1: Instruction{"POP HL", 12, 1, func() { gbcpu.POPrr(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
 		0xE2: Instruction{"LD ($FF00+C),A", 8, 1, func() { gbcpu.LDffrr(&gbcpu.Regs.c, &gbcpu.Regs.a) }},
 		// 0xE3: no corresponding instruction
 		// 0xE4: no corresponding instruction
