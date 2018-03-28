@@ -331,26 +331,25 @@ func (gbcpu *GBCPU) ADDrr(reg1, reg2 *byte) {
 // TODO Double-check this carry calculation
 func (gbcpu *GBCPU) ADDrn(reg *byte) {
 	operands := gbcpu.getOperands(1)
+	oldVal := *reg
 	*reg = *reg + operands[0]
 
-	sum := (*reg & 0xf) + (operands[0] & 0xf)
-
 	// Check for zero
-	if sum == 0x0 {
+	if *reg == 0x0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
 	}
 
 	// Check for carry
-	if sum > 255 {
+	if oldVal != 0 && *reg >= 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
 	// Check for half carry
-	if sum&0x10 == 0x10 {
+	if *reg&0x10 == 0x10 {
 		// Half-carry occurred
 		gbcpu.Regs.setHalfCarry()
 	} else {
@@ -654,16 +653,24 @@ func (gbcpu *GBCPU) XORn() {
 	gbcpu.Regs.clearCarry()
 }
 
+// XORaa -> e.g. XOR (HL)
+// Bitwise XOR of value at addr a1a2 into A
+// Flags: Z000
 func (gbcpu *GBCPU) XORaa(a1, a2 *byte) {
-	val := gbcpu.getValCartAddr(a1, a2, 1)
-	gbcpu.Regs.a ^= val[0]
-	if gbcpu.Regs.a == 0 {
-		// TODO
-		// Set zero flag
+	val := GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+	gbcpu.Regs.a ^= val
+
+	// Check for zero
+	if gbcpu.Regs.a == 0x00 {
+		gbcpu.Regs.setZero()
 	} else {
-		// TODO
-		// Reseto zero flag
+		gbcpu.Regs.clearZero()
 	}
+
+	// Set flags
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
+	gbcpu.Regs.clearCarry()
 }
 
 // SUBn -> e.g. SUB i8
@@ -872,6 +879,7 @@ func (gbcpu *GBCPU) CPn() {
 	fmt.Printf("%02X\n", operands[0])
 	gbcpu.Regs.Dump()
 	sub := gbcpu.Regs.a - operands[0]
+	halfCarry := ((gbcpu.Regs.a & 0xf) - (operands[0] & 0xf)) & 0x10
 
 	// Check for zero
 	if sub == 0x0 {
@@ -888,7 +896,7 @@ func (gbcpu *GBCPU) CPn() {
 	}
 
 	// Check for half carry
-	if sub&0x10 == 0x10 {
+	if halfCarry == 0x10 {
 		// Half-carry occurred
 		gbcpu.Regs.setHalfCarry()
 	} else {
@@ -924,6 +932,7 @@ func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
 	// val := gbcpu.getValCartAddr(a1, a2, 1)
 	// *reg = val[0]
 	*reg = GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+	fmt.Println(GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})])
 	gbcpu.Regs.Dump()
 }
 
@@ -961,7 +970,7 @@ func (gbcpu *GBCPU) LDffnr(reg *byte) {
 	addr := make([]byte, 2)
 	// -1 here to not go OOB of the ROM
 	// TODO: is 0-indexing a problem in general?
-	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0])-1)
+	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0]))
 	GbMMU.WriteByte(addr, *reg)
 }
 
@@ -1085,19 +1094,27 @@ func (gbcpu *GBCPU) CALLNCaa() {
 
 // Add byte at PC + 1 to PC, and set PC to that value
 func (gbcpu *GBCPU) JRn() {
-	operand := gbcpu.getOperands(1)
-	newPC := gbcpu.sliceToInt(gbcpu.Regs.PC) + uint16(operand[0])
+	operand := gbcpu.getOperands(1)[0]
+	mask := (uint16(operand) ^ 0x80) - 0x80
+	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
 	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
 }
 
 func (gbcpu *GBCPU) JRZn() {
-	// TODO
+	operand := gbcpu.getOperands(1)[0]
+	mask := (uint16(operand) ^ 0x80) - 0x80
+	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
+
+	if gbcpu.Regs.getZero() != 0 {
+		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	}
 }
 
 // Jumps if zero flag = 0
 func (gbcpu *GBCPU) JRNZn() {
 	operand := gbcpu.getOperands(1)[0]
-	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + uint16(operand)) - 256
+	mask := (uint16(operand) ^ 0x80) - 0x80
+	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
 
 	if gbcpu.Regs.getZero() == 0 {
 		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
@@ -1105,11 +1122,23 @@ func (gbcpu *GBCPU) JRNZn() {
 }
 
 func (gbcpu *GBCPU) JRCn() {
-	// TODO
+	operand := gbcpu.getOperands(1)[0]
+	mask := (uint16(operand) ^ 0x80) - 0x80
+	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
+
+	if gbcpu.Regs.getCarry() != 0 {
+		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	}
 }
 
 func (gbcpu *GBCPU) JRNCn() {
-	// TODO
+	operand := gbcpu.getOperands(1)[0]
+	mask := (uint16(operand) ^ 0x80) - 0x80
+	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
+
+	if gbcpu.Regs.getCarry() == 0 {
+		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	}
 }
 
 func (gbcpu *GBCPU) CCF() {
@@ -1182,6 +1211,14 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 	b2 := gbcpu.popByteFromStack()
 	*reg1 = b2
 	*reg2 = b1
+	gbcpu.Regs.Dump()
+}
+
+func (gbcpu *GBCPU) POPHL(reg1, reg2 *byte) {
+	b1 := gbcpu.popByteFromStack()
+	b2 := gbcpu.popByteFromStack()
+	*reg1 = b1
+	*reg2 = b2
 	gbcpu.Regs.Dump()
 }
 

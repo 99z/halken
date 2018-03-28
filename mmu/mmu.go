@@ -62,6 +62,9 @@ func (gbmmu *GBMMU) InitMMU() {
 
 func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
 	addrInt := binary.LittleEndian.Uint16(addr)
+	if addrInt >= 65535 {
+		addrInt--
+	}
 	gbmmu.Memory[addrInt] = data
 	// memLoc := addrInt & 0x0FFF
 }

@@ -228,7 +228,7 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0xC8: Instruction{"RET Z", 8, 1, func() { gbcpu.RETZ() }},
 		0xC9: Instruction{"RET", 16, 1, func() { gbcpu.RET() }},
 		0xCA: Instruction{"JP Z,a16", 12, 3, func() { gbcpu.JPZaa() }},
-		0xCB: Instruction{"PREFIX CB", 4, 1, func() {}},
+		0xCB: Instruction{"PREFIX CB", 4, 2, func() {}},
 		0xCC: Instruction{"CALL Z,a16", 12, 3, func() { gbcpu.CALLZaa() }},
 		0xCD: Instruction{"CALL a16", 24, 3, func() { gbcpu.CALLaa() }},
 		0xCE: Instruction{"ADC A,i8", 8, 2, func() { gbcpu.ADCrn(&gbcpu.Regs.a) }},
@@ -250,7 +250,7 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0xDE: Instruction{"SBC A,i8", 8, 2, func() { gbcpu.SBCrn(&gbcpu.Regs.a) }},
 		0xDF: Instruction{"RST 18H", 16, 1, func() { gbcpu.RST(0x18) }},
 		0xE0: Instruction{"LD ($FF00+a8),A", 12, 2, func() { gbcpu.LDffnr(&gbcpu.Regs.a) }},
-		0xE1: Instruction{"POP HL", 12, 1, func() { gbcpu.POPrr(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
+		0xE1: Instruction{"POP HL", 12, 1, func() { gbcpu.POPHL(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
 		0xE2: Instruction{"LD ($FF00+C),A", 8, 1, func() { gbcpu.LDffrr(&gbcpu.Regs.c, &gbcpu.Regs.a) }},
 		// 0xE3: no corresponding instruction
 		// 0xE4: no corresponding instruction
