@@ -11,10 +11,11 @@ type GBCPU struct {
 	// Total machine cycles
 	mCycles int
 	// Total time cycles
-	TCycles uint16
-	Regs    *Registers
-	Instrs  map[byte]Instruction
-	Jumped  bool
+	TCycles  uint16
+	Regs     *Registers
+	Instrs   map[byte]Instruction
+	InstrsCB map[byte]Instruction
+	Jumped   bool
 }
 
 // InitCPU initializes a new CPU struct
