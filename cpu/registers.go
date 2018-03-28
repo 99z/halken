@@ -109,8 +109,7 @@ func (regs *Registers) setZero() {
 }
 
 func (regs *Registers) clearZero() {
-	mask := ^(1 << 7)
-	regs.f &= byte(mask)
+	regs.f &^= (1 << 7)
 }
 
 func (regs *Registers) getZero() byte {

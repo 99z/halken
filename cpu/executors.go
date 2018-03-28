@@ -153,6 +153,8 @@ func (gbcpu *GBCPU) INCrn(reg *byte) {
 // DECr -> e.g. DEC B
 // Subtracts 1 from register, sets new value
 // Flags: Z1H-
+// Note: Docs say half-carry should be checked for here, but doesn't seem
+// to be the case when tracing through the tests
 func (gbcpu *GBCPU) DECr(reg *byte) {
 	*reg--
 
@@ -164,16 +166,17 @@ func (gbcpu *GBCPU) DECr(reg *byte) {
 	}
 
 	// Check for half carry
-	if *reg&0x10 == 0x10 {
-		// Half-carry occurred
-		gbcpu.Regs.setHalfCarry()
-	} else {
-		// Half-carry did not occur
-		gbcpu.Regs.clearHalfCarry()
-	}
+	// if sub != 0 {
+	// 	// Half-carry occurred
+	// 	gbcpu.Regs.setHalfCarry()
+	// } else {
+	// 	// Half-carry did not occur
+	// 	gbcpu.Regs.clearHalfCarry()
+	// }
 
 	// Set subtract flag
 	gbcpu.Regs.setSubtract()
+	fmt.Printf("FLAGS: %08b\n", gbcpu.Regs.f)
 }
 
 func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
@@ -918,8 +921,10 @@ func (gbcpu *GBCPU) PUSHrr(reg1, reg2 *byte) {
 // a1, s2 are 8-bit components of a 16-bit address
 // Loads value at location a1a2 into reg
 func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
-	val := gbcpu.getValCartAddr(a1, a2, 1)
-	*reg = val[0]
+	// val := gbcpu.getValCartAddr(a1, a2, 1)
+	// *reg = val[0]
+	*reg = GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+	gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
@@ -982,7 +987,7 @@ func (gbcpu *GBCPU) LDDaaR(a1, a2, reg *byte) {
 // Increment reg
 func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
 	GbMMU.WriteByte([]byte{*a2, *a1}, *reg)
-	*reg++
+	gbcpu.Regs.incrementHL(1)
 }
 
 // Set value in reg to value at address a1a2

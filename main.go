@@ -80,7 +80,7 @@ func updateGraphics(cycles int) {
 	setLCDStatus()
 
 	if lcdEnabled() != 0 {
-		GbMMU.ScanlineCount -= uint16(cycles)
+		GbMMU.ScanlineCount -= int16(cycles)
 	} else {
 		return
 	}
@@ -128,7 +128,7 @@ func setLCDStatus() {
 		status &= byte(mask)
 		reqInt = status & (1 << 4)
 	} else {
-		var mode2Bounds uint16 = 376
+		var mode2Bounds int16 = 376
 		mode3Bounds := mode2Bounds - 172
 
 		// If true, in mode 2
