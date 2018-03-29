@@ -2,16 +2,10 @@ package cpu
 
 import (
 	"encoding/binary"
-
-	"../mmu"
 )
 
 // Good reference with some info Z80 heaven doesn't contain:
 // http://www.devrs.com/gb/files/GBCPU_Instr.html
-
-// GbMMU variable injection from main.go
-// Prevents having to set MMU pointer as a field on the CPU struct
-var GbMMU *mmu.GBMMU
 
 // RLCr -> e.g. RLC B
 // Performs 8-bit rotation to the left
