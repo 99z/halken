@@ -28,7 +28,8 @@ func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 // LDSPHL -> e.g. LD SP,HL
 // Loads bytes from register pair HL into SP
 func (gbcpu *GBCPU) LDSPHL(reg1, reg2 *byte) {
-	gbcpu.Regs.sp = []byte{*reg1, *reg2}
+	gbcpu.Regs.sp = []byte{*reg2, *reg1}
+	gbcpu.Regs.Dump()
 }
 
 // LDrrSPs -> e.g. LD BC,SP+s8
@@ -74,8 +75,8 @@ func (gbcpu *GBCPU) LDrrSPs(reg1, reg2 *byte) {
 // Loads 1 8-bit immediate operand into a register
 func (gbcpu *GBCPU) LDrn(reg *byte) {
 	operand := gbcpu.getOperands(1)
-	fmt.Printf("%04X\n", operand[0])
 	*reg = operand[0]
+	gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) LDrrr(reg1, reg2, op *byte) {
@@ -125,13 +126,7 @@ func (gbcpu *GBCPU) INCaa(reg1, reg2 *byte) {
 }
 
 func (gbcpu *GBCPU) DECaa(reg1, reg2 *byte) {
-	val := gbcpu.getValCartAddr(reg1, reg2, 2)
-	intVal := gbcpu.sliceToInt(val)
-	intVal--
-	buf := make([]byte, 2)
-	binary.LittleEndian.PutUint16(buf, intVal)
-	*reg1 = buf[0]
-	*reg2 = buf[1]
+	GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*reg2, *reg1})]--
 }
 
 func (gbcpu *GBCPU) INCSP() {
@@ -176,7 +171,7 @@ func (gbcpu *GBCPU) DECr(reg *byte) {
 
 	// Set subtract flag
 	gbcpu.Regs.setSubtract()
-	fmt.Printf("FLAGS: %08b\n", gbcpu.Regs.f)
+	gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
@@ -210,11 +205,19 @@ func (gbcpu *GBCPU) RLCA() {
 // Old carry becomes new 7th bit
 // Flags: 000C
 func (gbcpu *GBCPU) RLA() {
-	carry := (gbcpu.Regs.a >> 7)
-	oldCarry := gbcpu.Regs.getCarry()
-	gbcpu.Regs.a = ((gbcpu.Regs.a << 1) | oldCarry)
+	lsBit := 0
 
-	if carry != 0x0 {
+	if gbcpu.Regs.a&0x80 == 0x80 {
+		lsBit = 1
+	}
+
+	gbcpu.Regs.a = gbcpu.Regs.a << 1
+
+	if gbcpu.Regs.getCarry() != 0 {
+		gbcpu.Regs.a ^= 0x01
+	}
+
+	if lsBit == 1 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -223,6 +226,7 @@ func (gbcpu *GBCPU) RLA() {
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.clearHalfCarry()
 	gbcpu.Regs.clearZero()
+	gbcpu.Regs.Dump()
 }
 
 // RRCA performs 8-bit rotation to the right
@@ -285,8 +289,9 @@ func (gbcpu *GBCPU) RST(imm byte) {
 
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
-	val := gbcpu.getValCartAddr(&operands[1], &operands[0], 2)
-	gbcpu.Regs.sp = val
+	addr := gbcpu.sliceToInt(operands)
+	GbMMU.Memory[addr] = gbcpu.Regs.sp[0]
+	GbMMU.Memory[addr+1] = gbcpu.Regs.sp[1]
 }
 
 func (gbcpu *GBCPU) LDSPnn() {
@@ -375,10 +380,12 @@ func (gbcpu *GBCPU) ADDrn(reg *byte) {
 // Result is written into reg
 // Flags: Z0HC
 func (gbcpu *GBCPU) ADCrn(reg *byte) {
+	gbcpu.Regs.Dump()
 	oldVal := *reg
 	operand := gbcpu.getOperands(1)[0]
 	result := (operand + gbcpu.Regs.getCarry()) + gbcpu.Regs.a
-	hc := (((operand & 0xf) + (gbcpu.Regs.getCarry() & 0xf) + (gbcpu.Regs.a)) & 0x10) == 0x10
+	fmt.Printf("OPERAND: %v, CARRY: %v", operand, gbcpu.Regs.getCarry())
+	hc := (((operand & 0xf) + (gbcpu.Regs.getCarry() & 0xf) + (gbcpu.Regs.a & 0xf)) & 0x10) == 0x10
 	*reg = result
 
 	// Check for zero
@@ -616,15 +623,16 @@ func (gbcpu *GBCPU) ORn() {
 	gbcpu.Regs.clearCarry()
 }
 
+// ORaa -> e.g. OR (HL)
+// Bitwise OR of byte at addr
+// Flags: Z000
 func (gbcpu *GBCPU) ORaa(a1, a2 *byte) {
-	val := gbcpu.getValCartAddr(a1, a2, 1)
-	gbcpu.Regs.a |= val[0]
-	if gbcpu.Regs.a == 0x00 {
-		// TODO
-		// Set zero flag
+	val := GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+	gbcpu.Regs.a |= val
+	if gbcpu.Regs.a == 0x0 {
+		gbcpu.Regs.setZero()
 	} else {
-		// TODO
-		// Reset zero flag
+		gbcpu.Regs.clearZero()
 	}
 }
 
@@ -971,8 +979,10 @@ func (gbcpu *GBCPU) LDnnr(reg *byte) {
 
 func (gbcpu *GBCPU) LDrnn(reg *byte) {
 	operands := gbcpu.getOperands(2)
+	fmt.Println(operands)
 	addr := gbcpu.sliceToInt(operands)
 	*reg = GbMMU.Memory[addr]
+	gbcpu.Regs.Dump()
 }
 
 // LDffrr sets value at (0xFF00+reg1) to reg2
@@ -989,8 +999,6 @@ func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
 func (gbcpu *GBCPU) LDffnr(reg *byte) {
 	operand := gbcpu.getOperands(1)
 	addr := make([]byte, 2)
-	// -1 here to not go OOB of the ROM
-	// TODO: is 0-indexing a problem in general?
 	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0]))
 	GbMMU.WriteByte(addr, *reg)
 }
@@ -1036,8 +1044,9 @@ func (gbcpu *GBCPU) JPaa() {
 	gbcpu.Jumped = true
 }
 
-func (gbcpu *GBCPU) JPrr(reg1, reg2 *byte) {
-	gbcpu.Regs.PC = []byte{*reg1, *reg2}
+func (gbcpu *GBCPU) JPHL(reg1, reg2 *byte) {
+	gbcpu.Regs.PC = []byte{*reg2, *reg1}
+	gbcpu.Jumped = true
 }
 
 func (gbcpu *GBCPU) JPZaa() {
@@ -1078,6 +1087,7 @@ func (gbcpu *GBCPU) CALLaa() {
 	binary.LittleEndian.PutUint16(nextInstrBytes, nextInstr)
 	gbcpu.pushByteToStack(nextInstrBytes[1])
 	gbcpu.pushByteToStack(nextInstrBytes[0])
+	fmt.Printf("%v\n", gbcpu.getOperands(2))
 	gbcpu.Regs.PC = gbcpu.getOperands(2)
 	// binary.LittleEndian.PutUint16(gbcpu.Regs.sp, gbcpu.sliceToInt(gbcpu.Regs.PC)+1)
 
@@ -1116,39 +1126,71 @@ func (gbcpu *GBCPU) CALLNCaa() {
 // Add byte at PC + 1 to PC, and set PC to that value
 func (gbcpu *GBCPU) JRn() {
 	operand := gbcpu.getOperands(1)[0]
-	mask := (uint16(operand) ^ 0x80) - 0x80
-	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
-	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	gbcpu.Regs.incrementPC(2)
+
+	if operand > 127 {
+		location := 256 - uint16(operand)
+		newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) - uint16(location)
+		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	} else {
+		newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) + uint16(operand)
+		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+	}
+	gbcpu.Jumped = true
 }
 
 func (gbcpu *GBCPU) JRZn() {
 	operand := gbcpu.getOperands(1)[0]
-	mask := (uint16(operand) ^ 0x80) - 0x80
-	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
 
 	if gbcpu.Regs.getZero() != 0 {
-		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		gbcpu.Regs.incrementPC(2)
+
+		if operand > 127 {
+			location := 256 - uint16(operand)
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) - uint16(location)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		} else {
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) + uint16(operand)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		}
+		gbcpu.Jumped = true
 	}
 }
 
 // Jumps if zero flag = 0
 func (gbcpu *GBCPU) JRNZn() {
 	operand := gbcpu.getOperands(1)[0]
-	mask := (uint16(operand) ^ 0x80) - 0x80
-	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
 
 	if gbcpu.Regs.getZero() == 0 {
-		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		gbcpu.Regs.incrementPC(2)
+
+		if operand > 127 {
+			location := 256 - uint16(operand)
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) - uint16(location)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		} else {
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) + uint16(operand)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		}
+		gbcpu.Jumped = true
 	}
 }
 
 func (gbcpu *GBCPU) JRCn() {
 	operand := gbcpu.getOperands(1)[0]
-	mask := (uint16(operand) ^ 0x80) - 0x80
-	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
 
 	if gbcpu.Regs.getCarry() != 0 {
-		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		gbcpu.Regs.incrementPC(2)
+
+		if operand > 127 {
+			location := 256 - uint16(operand)
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) - uint16(location)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		} else {
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) + uint16(operand)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		}
+		gbcpu.Jumped = true
 	}
 }
 
@@ -1157,11 +1199,19 @@ func (gbcpu *GBCPU) JRCn() {
 // Jumps to new addr if carry is not set
 func (gbcpu *GBCPU) JRNCn() {
 	operand := gbcpu.getOperands(1)[0]
-	mask := (uint16(operand) ^ 0x80) - 0x80
-	newPC := (gbcpu.sliceToInt(gbcpu.Regs.PC) + mask)
 
 	if gbcpu.Regs.getCarry() == 0 {
-		binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		gbcpu.Regs.incrementPC(2)
+
+		if operand > 127 {
+			location := 256 - uint16(operand)
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) - uint16(location)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		} else {
+			newPC := binary.LittleEndian.Uint16(gbcpu.Regs.PC) + uint16(operand)
+			binary.LittleEndian.PutUint16(gbcpu.Regs.PC, newPC)
+		}
+		gbcpu.Jumped = true
 	}
 }
 
@@ -1199,8 +1249,8 @@ func (gbcpu *GBCPU) RETI() {
 }
 
 func (gbcpu *GBCPU) RETZ() {
-	z := ((gbcpu.Regs.f >> 7) & 1)
-	if z != 0 {
+	gbcpu.Regs.Dump()
+	if gbcpu.Regs.getZero() != 0 {
 		gbcpu.RET()
 	}
 }

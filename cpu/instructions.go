@@ -258,7 +258,7 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0xE6: Instruction{"AND i8", 8, 2, func() { gbcpu.ANDn() }},
 		0xE7: Instruction{"RST 20H", 16, 1, func() { gbcpu.RST(0x20) }},
 		0xE8: Instruction{"ADD SP,s8", 16, 2, func() { gbcpu.ADDSPs() }},
-		0xE9: Instruction{"JP (HL)", 4, 1, func() { gbcpu.JPrr(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
+		0xE9: Instruction{"JP (HL)", 4, 1, func() { gbcpu.JPHL(&gbcpu.Regs.h, &gbcpu.Regs.l) }},
 		0xEA: Instruction{"LD (a16),A", 16, 3, func() { gbcpu.LDnnr(&gbcpu.Regs.a) }},
 		// 0xEB: no corresponding instruction
 		// 0xEC: no corresponding instruction

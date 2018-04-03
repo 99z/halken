@@ -34,9 +34,9 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.areas["zeroPage"] = []uint16{0xFF80, 0xFFFE}
 	gbmmu.areas["interruptFlag"] = []uint16{0xFFFF}
 
-	// I/O register initial values
-	// Since Go zeroes by default, don't need to explicitly
-	// set 0x00 values
+	// I/O register initial values after boot ROM
+	// TODO Might want to just execute boot ROM instead, since
+	// documentation online is sketchy about these
 	gbmmu.Memory[0xFF10] = 0x80
 	gbmmu.Memory[0xFF11] = 0xBF
 	gbmmu.Memory[0xFF12] = 0xF3
@@ -53,11 +53,13 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.Memory[0xFF25] = 0xF3
 	gbmmu.Memory[0xFF26] = 0xF1
 	gbmmu.Memory[0xFF40] = 0x91
+	// Not in pandocs
+	gbmmu.Memory[0xFF41] = 0x85
 	gbmmu.Memory[0xFF47] = 0xFC
 	gbmmu.Memory[0xFF48] = 0xFF
 	gbmmu.Memory[0xFF49] = 0xFF
 
-	gbmmu.ScanlineCount = 456
+	gbmmu.ScanlineCount = 0
 }
 
 func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {

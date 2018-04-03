@@ -53,6 +53,7 @@ func update() {
 	// Since running at 60 FPS, each cycle max must be 4194304/60 = 69905
 	for updateCycles < maxCycles {
 		GbCPU.Jumped = false
+		fmt.Printf("%v\n", GbMMU.Memory[49174:49176])
 		opcode := GbCPU.Regs.PC[:]
 		opcodeInt := binary.LittleEndian.Uint16(opcode)
 
@@ -60,6 +61,7 @@ func update() {
 
 		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 		GbCPU.Instrs[operation].Executor()
+		fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
 
 		// Update cycles
 		updateCycles += int(GbCPU.Instrs[operation].TCycles)
@@ -71,7 +73,11 @@ func update() {
 			continue
 		} else {
 			nextInstr := binary.LittleEndian.Uint16(GbCPU.Regs.PC) + GbCPU.Instrs[operation].NumOperands
-			binary.LittleEndian.PutUint16(GbCPU.Regs.PC, nextInstr)
+			// Interesting problem if we don't make a new byte array here
+			// TODO Explain exactly what it is... when I understand it
+			nextInstrAdddr := make([]byte, 2)
+			binary.LittleEndian.PutUint16(nextInstrAdddr, nextInstr)
+			GbCPU.Regs.PC = nextInstrAdddr
 		}
 	}
 }
@@ -87,7 +93,7 @@ func updateGraphics(cycles int) {
 
 	if GbMMU.ScanlineCount <= 0 {
 		GbMMU.Memory[0xFF44]++
-		GbMMU.ScanlineCount = 456
+		GbMMU.ScanlineCount += 456
 
 		if GbMMU.Memory[0xFF44] > 153 {
 			GbMMU.Memory[0xFF44] = 0
@@ -145,8 +151,6 @@ func setLCDStatus() {
 		} else {
 			mode = 0
 			mask := ^(1 << 1)
-			status &= byte(mask)
-			mask = ^(1 << 0)
 			status &= byte(mask)
 			reqInt = status & (1 << 4)
 		}

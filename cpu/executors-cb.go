@@ -109,13 +109,14 @@ func (gbcpu *GBCPU) RLHL() {
 
 // RRr -> e.g. RR B
 // Rotates register right through CF
-// Store old 0th bit into carry
-// Old carry becomes new 7th bit
 // Flags: Z00C
 func (gbcpu *GBCPU) RRr(reg *byte) {
-	carry := (*reg << 7)
-	oldCarry := gbcpu.Regs.getCarry()
-	*reg = ((*reg >> 1) | oldCarry)
+	msBit := 0
+	if *reg&0x01 == 0x01 {
+		msBit = 1
+	}
+
+	*reg = *reg >> 1
 
 	if *reg == 0x0 {
 		gbcpu.Regs.setZero()
@@ -123,7 +124,11 @@ func (gbcpu *GBCPU) RRr(reg *byte) {
 		gbcpu.Regs.clearZero()
 	}
 
-	if carry != 0x0 {
+	if gbcpu.Regs.getCarry() != 0x0 {
+		*reg ^= 0x80
+	}
+
+	if msBit != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -131,7 +136,8 @@ func (gbcpu *GBCPU) RRr(reg *byte) {
 
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.clearHalfCarry()
-	gbcpu.Regs.clearZero()
+
+	gbcpu.Regs.Dump()
 }
 
 // RRHL -> e.g. RR (HL)
@@ -239,6 +245,8 @@ func (gbcpu *GBCPU) SRLr(reg *byte) {
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
+
+	gbcpu.Regs.Dump()
 }
 
 // SRLHL -> e.g. SRL (HL)

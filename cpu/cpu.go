@@ -35,6 +35,10 @@ func (gbcpu *GBCPU) readPC() {
 	// Might need if decide not to export Regs
 }
 
+func (gbcpu *GBCPU) GetFlags() byte {
+	return gbcpu.Regs.f
+}
+
 func (gbcpu *GBCPU) pushByteToStack(data byte) {
 	gbcpu.Regs.decrementSP(1)
 	GbMMU.WriteByte(gbcpu.Regs.sp, data)

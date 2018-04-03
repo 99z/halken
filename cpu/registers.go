@@ -144,7 +144,11 @@ func (regs *Registers) clearCarry() {
 }
 
 func (regs *Registers) getCarry() byte {
-	return regs.f & (1 << 4)
+	if regs.f&(1<<4) != 0 {
+		return 1
+	}
+
+	return 0
 }
 
 func (regs *Registers) Dump() {
