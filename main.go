@@ -53,21 +53,21 @@ func update() {
 	// Since running at 60 FPS, each cycle max must be 4194304/60 = 69905
 	for updateCycles < maxCycles {
 		GbCPU.Jumped = false
-		fmt.Printf("%v\n", GbMMU.Memory[49174:49176])
 		opcode := GbCPU.Regs.PC[:]
 		opcodeInt := binary.LittleEndian.Uint16(opcode)
 
 		operation := GbMMU.Memory[opcodeInt]
 
 		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-		GbCPU.Instrs[operation].Executor()
+		delay := GbCPU.Instrs[operation].Executor()
 		fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
+		fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
 
 		// Update cycles
-		updateCycles += int(GbCPU.Instrs[operation].TCycles)
+		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 
 		// Update graphics
-		updateGraphics(updateCycles)
+		updateGraphics(int(GbCPU.Instrs[operation].TCycles) + delay)
 
 		if GbCPU.Jumped {
 			continue

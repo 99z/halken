@@ -59,7 +59,7 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.Memory[0xFF48] = 0xFF
 	gbmmu.Memory[0xFF49] = 0xFF
 
-	gbmmu.ScanlineCount = 0
+	gbmmu.ScanlineCount = 456
 }
 
 func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
