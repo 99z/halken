@@ -228,7 +228,9 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0xC8: Instruction{"RET Z", 8, 1, func() int { return gbcpu.RETZ() }},
 		0xC9: Instruction{"RET", 16, 1, func() int { gbcpu.RET(); return 0 }},
 		0xCA: Instruction{"JP Z,a16", 12, 3, func() int { return gbcpu.JPZaa() }},
-		0xCB: Instruction{"PREFIX CB", 4, 2, func() int { gbcpu.CB(); return 0 }},
+		// CB Prefix takes 4 cycles to execute alone, but that overhead is
+		// included in the total cycles for the CB instructions
+		0xCB: Instruction{"PREFIX CB", 0, 2, func() int { return gbcpu.CB() }},
 		0xCC: Instruction{"CALL Z,a16", 12, 3, func() int { return gbcpu.CALLZaa() }},
 		0xCD: Instruction{"CALL a16", 24, 3, func() int { gbcpu.CALLaa(); return 0 }},
 		0xCE: Instruction{"ADC A,i8", 8, 2, func() int { gbcpu.ADCrn(&gbcpu.Regs.a); return 0 }},

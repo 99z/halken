@@ -63,6 +63,11 @@ func update() {
 		fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
 		fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
 
+		if opcode[0] == 68 && opcode[1] == 203 {
+			fmt.Println(GbMMU.Memory[40960:40963])
+			os.Exit(0)
+		}
+
 		// Update cycles
 		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 

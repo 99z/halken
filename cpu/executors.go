@@ -1508,10 +1508,11 @@ func (gbcpu *GBCPU) DI() {
 	// Disables interrupts
 }
 
-func (gbcpu *GBCPU) CB() {
+func (gbcpu *GBCPU) CB() int {
 	operand := gbcpu.getOperands(1)[0]
 	fmt.Printf("Executing: %s\n", gbcpu.InstrsCB[operand].Mnemonic)
 	gbcpu.InstrsCB[operand].Executor()
+	return int(gbcpu.InstrsCB[operand].TCycles)
 }
 
 func (gbcpu *GBCPU) sliceToInt(slice []byte) uint16 {
