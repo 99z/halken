@@ -126,7 +126,8 @@ func (gbcpu *GBCPU) INCaa(reg1, reg2 *byte) {
 }
 
 func (gbcpu *GBCPU) DECaa(reg1, reg2 *byte) {
-	GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*reg2, *reg1})]--
+	val := GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*reg2, *reg1})]
+	GbMMU.WriteByte([]byte{*reg2, *reg1}, val-1)
 }
 
 func (gbcpu *GBCPU) INCSP() {
@@ -289,9 +290,11 @@ func (gbcpu *GBCPU) RST(imm byte) {
 
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
-	addr := gbcpu.sliceToInt(operands)
-	GbMMU.Memory[addr] = gbcpu.Regs.sp[0]
-	GbMMU.Memory[addr+1] = gbcpu.Regs.sp[1]
+	addrInc := binary.LittleEndian.Uint16(operands) + 1
+	addrIncSlice := make([]byte, 2)
+	binary.LittleEndian.PutUint16(addrIncSlice, addrInc)
+	GbMMU.WriteByte(operands, gbcpu.Regs.sp[0])
+	GbMMU.WriteByte(addrIncSlice, gbcpu.Regs.sp[1])
 }
 
 func (gbcpu *GBCPU) LDSPnn() {

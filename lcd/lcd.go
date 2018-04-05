@@ -3,6 +3,7 @@ package lcd
 import (
 	"encoding/binary"
 	"fmt"
+	"image/color"
 	"os"
 	"time"
 
@@ -11,6 +12,23 @@ import (
 	"github.com/hajimehoshi/ebiten"
 	"github.com/hajimehoshi/ebiten/ebitenutil"
 )
+
+type GBLCD struct {
+	// 160*144 screen size, where each xy can be an RGBA value
+	screen    [23040]color.RGBA
+	mode      uint8
+	tileset   [2]byte
+	LineCount int16
+}
+
+func (gblcd *GBLCD) reset() {
+	// Initialize screen to white
+	for i := range gblcd.screen {
+		gblcd.screen[i] = color.RGBA{255, 255, 255, 1}
+	}
+
+	gblcd.LineCount = 456
+}
 
 const maxCycles = 69905
 
@@ -22,17 +40,17 @@ var (
 	second = time.Tick(time.Second)
 )
 
-func Run(screen *ebiten.Image) error {
+func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("%v", ebiten.CurrentFPS()))
 	// Logical update
-	Update()
+	gblcd.Update()
 
 	// Graphics update
 
 	return nil
 }
 
-func Update() {
+func (gblcd *GBLCD) Update() {
 	// Main loop
 	// 1. Execute next operation
 	// 2. Update total cycles
@@ -64,7 +82,7 @@ func Update() {
 		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 
 		// Update graphics
-		updateGraphics(int(GbCPU.Instrs[operation].TCycles) + delay)
+		gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles) + delay)
 
 		if GbCPU.Jumped {
 			continue
@@ -79,21 +97,22 @@ func Update() {
 	}
 }
 
-func updateGraphics(cycles int) {
-	setLCDStatus()
+func (gblcd *GBLCD) updateGraphics(cycles int) {
+	gblcd.setLCDStatus()
 
 	if lcdEnabled() != 0 {
-		GbMMU.ScanlineCount -= int16(cycles)
+		gblcd.LineCount -= int16(cycles)
 	} else {
 		return
 	}
 
-	if GbMMU.ScanlineCount <= 0 {
+	if gblcd.LineCount <= 0 {
 		GbMMU.Memory[0xFF44]++
-		GbMMU.ScanlineCount += 456
+		gblcd.LineCount += 456
 
 		if GbMMU.Memory[0xFF44] > 153 {
 			GbMMU.Memory[0xFF44] = 0
+			gblcd.mode = 2
 		}
 	}
 }
@@ -104,13 +123,13 @@ func lcdEnabled() byte {
 
 // Good info on setting LCD status
 // http://www.codeslinger.co.uk/pages/projects/gameboy/lcd.html
-func setLCDStatus() {
+func (gblcd *GBLCD) setLCDStatus() {
 	// Get value of LCD status
 	status := GbMMU.Memory[0xFF41]
 	lcdStatus := lcdEnabled()
 
 	if lcdStatus == 0 {
-		GbMMU.ScanlineCount = 456
+		gblcd.LineCount = 456
 		GbMMU.Memory[0xFF44] = 0
 		status &= 252
 		status |= (1 << 0)
@@ -123,9 +142,9 @@ func setLCDStatus() {
 	var mode byte
 	var reqInt byte
 
-	// If true, in VBlank, set mode to 1
 	if currentLine >= 144 {
-		mode = 1
+		// VBlank
+		gblcd.mode = 1
 		status |= (1 << 0)
 		mask := ^(1 << 1)
 		status &= byte(mask)
@@ -134,22 +153,31 @@ func setLCDStatus() {
 		var mode2Bounds int16 = 376
 		mode3Bounds := mode2Bounds - 172
 
-		// If true, in mode 2
-		if GbMMU.ScanlineCount >= mode2Bounds {
-			mode = 2
+		if gblcd.LineCount >= mode2Bounds {
+			// OAM read mode
+			gblcd.mode = 2
 			status |= (1 << 1)
 			mask := ^(1 << 0)
 			status &= byte(mask)
 			reqInt = status & (1 << 5)
-		} else if GbMMU.ScanlineCount >= mode3Bounds {
-			mode = 3
+		} else if gblcd.LineCount >= mode3Bounds {
+			// VRAM read mode
+			gblcd.mode = 3
 			status |= (1 << 1)
 			status |= (1 << 0)
+
+			// TODO Write a scanline to the framebuffer
 		} else {
-			mode = 0
+			// HBlank
+			gblcd.mode = 0
 			mask := ^(1 << 1)
 			status &= byte(mask)
 			reqInt = status & (1 << 4)
+
+			if gblcd.LineCount == 143 {
+				gblcd.mode = 1
+				// TODO Write data to screen
+			}
 		}
 	}
 

@@ -13,6 +13,7 @@ import (
 // Global variables for component structs
 var GbCPU = new(cpu.GBCPU)
 var GbMMU = new(mmu.GBMMU)
+var GbLCD = new(lcd.GBLCD)
 
 func main() {
 	cartPath := os.Args[1]
@@ -29,5 +30,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	ebiten.Run(lcd.Run, 160, 144, 2, "Halken")
+	ebiten.Run(GbLCD.Run, 160, 144, 2, "Halken")
 }
