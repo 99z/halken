@@ -3,8 +3,8 @@ package lcd
 import (
 	"encoding/binary"
 	"fmt"
+	"image"
 	"image/color"
-	"os"
 	"time"
 
 	"../cpu"
@@ -48,9 +48,12 @@ var (
 )
 
 func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%v", ebiten.CurrentFPS()))
 	// Logical update
 	gblcd.Update(screen)
+	bgTiles := loadBGTiles()
+	ebitenBG, _ := ebiten.NewImageFromImage(bgTiles, ebiten.FilterDefault)
+	opts := &ebiten.DrawImageOptions{}
+	screen.DrawImage(ebitenBG, opts)
 
 	// Graphics update
 
@@ -80,9 +83,11 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 		//fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
 		//fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
 
-		if opcode[0] == 68 && opcode[1] == 203 {
-			os.Exit(0)
-		}
+		// if opcode[0] == 68 && opcode[1] == 203 {
+		// 	os.Exit(0)
+		// }
+
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("%02X:%02X", opcode[1], opcode[0]))
 
 		// Update cycles
 		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
@@ -112,6 +117,46 @@ func lcdEnabled() byte {
 	return GbMMU.Memory[STAT] & (1 << 7)
 }
 
+func loadBGTiles() *image.RGBA {
+	bg := image.NewRGBA(image.Rect(0, 0, 128, 128))
+	tiles := GbMMU.Memory[0x8000:0x9000]
+	const tileBytes = 16
+
+	palette := [4]color.RGBA{
+		color.RGBA{255, 255, 255, 255},
+		color.RGBA{170, 170, 170, 255},
+		color.RGBA{85, 85, 85, 255},
+		color.RGBA{0, 0, 0, 255},
+	}
+
+	// Iterate over 8x8 tiles
+	for tile := 0; tile < 256; tile++ {
+		tileX := (tile % 16) * 8
+		tileY := (tile / 16) * 8
+		// Iterate over lines of tiles, represented by 2 bytes
+		for line := 0; line < 8; line++ {
+			hi := tiles[(tile*tileBytes)+line*2]
+			lo := tiles[(tile*tileBytes)+line*2+1]
+
+			// Iterate over individual pixels of tile lines
+			for pix := 0; pix < 8; pix++ {
+				hiBit := (hi >> (7 - uint8(pix))) & 1
+				loBit := (lo >> (7 - uint8(pix))) & 1
+
+				colorIndex := loBit + hiBit*2
+				color := palette[colorIndex]
+
+				pixX := tileX + pix
+				pixY := tileY + line
+
+				bg.Set(pixX, pixY, color)
+			}
+		}
+	}
+
+	return bg
+}
+
 func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	switch gblcd.mode {
 	// OAM read mode
@@ -138,6 +183,7 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 			if gblcd.currentLine == 143 {
 				gblcd.mode = 1
 				// TODO draw image to screen
+				// gblcd.drawDebugTiles(screen)
 				// screen.Fill(color.RGBA{255, 255, 255, 255})
 			} else {
 				gblcd.mode = 2
@@ -160,6 +206,12 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	}
 }
 
-func (gblcd *GBLCD) drawScanline() {
+func (gblcd *GBLCD) drawDebugTiles(screen *ebiten.Image) {
+	// square, _ := ebiten.NewImage(32, 32, ebiten.FilterNearest)
+	// square.Fill(color.White)
+	// opts := &ebiten.DrawImageOptions{}
+	// opts.GeoM.Translate(200, float64(gblcd.modeClock))
+	// screen.DrawImage(square, opts)
 
+	// tiles := GbMMU.Memory[0x8300:0x8400]
 }

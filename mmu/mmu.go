@@ -64,6 +64,10 @@ func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
 	if addrInt >= 65535 {
 		addrInt--
 	}
+
+	// if addrInt >= 0x8000 && addrInt <= 0x97FF {
+	// 	fmt.Printf("Wrote to %04X\n", addrInt)
+	// }
 	gbmmu.Memory[addrInt] = data
 	// memLoc := addrInt & 0x0FFF
 }

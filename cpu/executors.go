@@ -1107,15 +1107,12 @@ func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
 }
 
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
-	addr := gbcpu.sliceToInt([]byte{*a2, *a1})
-
-	GbMMU.Memory[addr] = *reg
+	GbMMU.WriteByte([]byte{*a2, *a1}, *reg)
 }
 
 func (gbcpu *GBCPU) LDnnr(reg *byte) {
 	operands := gbcpu.getOperands(2)
-	addr := gbcpu.sliceToInt(operands)
-	GbMMU.Memory[addr] = *reg
+	GbMMU.WriteByte(operands, *reg)
 }
 
 func (gbcpu *GBCPU) LDrnn(reg *byte) {
@@ -1151,12 +1148,12 @@ func (gbcpu *GBCPU) LDrffn(reg *byte) {
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
-	operand := gbcpu.getOperands(1)
-	GbMMU.Memory[gbcpu.sliceToInt([]byte{*reg1, *reg2})] = operand[0]
+	operand := gbcpu.getOperands(1)[0]
+	GbMMU.WriteByte([]byte{*reg1, *reg2}, operand)
 }
 
 func (gbcpu *GBCPU) LDDaaR(a1, a2, reg *byte) {
-	GbMMU.Memory[gbcpu.sliceToInt([]byte{*a2, *a1})] = *reg
+	GbMMU.WriteByte([]byte{*a2, *a1}, *reg)
 	*reg--
 }
 
