@@ -3,7 +3,8 @@ package lcd
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
+	"image"
+	"image/color"
 	"time"
 
 	"../cpu"
@@ -11,6 +12,30 @@ import (
 	"github.com/hajimehoshi/ebiten"
 	"github.com/hajimehoshi/ebiten/ebitenutil"
 )
+
+type GBLCD struct {
+	// 160*144 screen size, where each xy can be an RGBA value
+	screen      [23040]color.RGBA
+	mode        uint8
+	tileset     [2]byte
+	modeClock   int16
+	currentLine uint16
+}
+
+const (
+	LCDC = 0xFF40
+	STAT = 0xFF41
+	LY   = 0xFF44
+)
+
+func (gblcd *GBLCD) reset() {
+	// Initialize screen to white
+	for i := range gblcd.screen {
+		gblcd.screen[i] = color.RGBA{255, 255, 255, 1}
+	}
+
+	gblcd.modeClock = 456
+}
 
 const maxCycles = 69905
 
@@ -22,17 +47,20 @@ var (
 	second = time.Tick(time.Second)
 )
 
-func Run(screen *ebiten.Image) error {
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("%v", ebiten.CurrentFPS()))
+func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	// Logical update
-	Update()
+	gblcd.Update(screen)
+	bgTiles := loadBGTiles()
+	ebitenBG, _ := ebiten.NewImageFromImage(bgTiles, ebiten.FilterDefault)
+	opts := &ebiten.DrawImageOptions{}
+	screen.DrawImage(ebitenBG, opts)
 
 	// Graphics update
 
 	return nil
 }
 
-func Update() {
+func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 	// Main loop
 	// 1. Execute next operation
 	// 2. Update total cycles
@@ -50,21 +78,22 @@ func Update() {
 
 		operation := GbMMU.Memory[opcodeInt]
 
-		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
+		//fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 		delay := GbCPU.Instrs[operation].Executor()
-		fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
-		fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
+		//fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
+		//fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
 
-		if opcode[0] == 68 && opcode[1] == 203 {
-			fmt.Println(GbMMU.Memory[40960:40963])
-			os.Exit(0)
-		}
+		// if opcode[0] == 68 && opcode[1] == 203 {
+		// 	os.Exit(0)
+		// }
+
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("%02X:%02X", opcode[1], opcode[0]))
 
 		// Update cycles
 		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 
 		// Update graphics
-		updateGraphics(int(GbCPU.Instrs[operation].TCycles) + delay)
+		gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
 
 		if GbCPU.Jumped {
 			continue
@@ -79,95 +108,110 @@ func Update() {
 	}
 }
 
-func updateGraphics(cycles int) {
-	setLCDStatus()
-
-	if lcdEnabled() != 0 {
-		GbMMU.ScanlineCount -= int16(cycles)
-	} else {
-		return
-	}
-
-	if GbMMU.ScanlineCount <= 0 {
-		GbMMU.Memory[0xFF44]++
-		GbMMU.ScanlineCount += 456
-
-		if GbMMU.Memory[0xFF44] > 153 {
-			GbMMU.Memory[0xFF44] = 0
-		}
-	}
+func (gblcd *GBLCD) updateGraphics(cycles int, screen *ebiten.Image) {
+	gblcd.modeClock += int16(cycles)
+	gblcd.setLCDStatus(screen)
 }
 
 func lcdEnabled() byte {
-	return GbMMU.Memory[0xFF40] & (1 << 7)
+	return GbMMU.Memory[STAT] & (1 << 7)
 }
 
-// Good info on setting LCD status
-// http://www.codeslinger.co.uk/pages/projects/gameboy/lcd.html
-func setLCDStatus() {
-	// Get value of LCD status
-	status := GbMMU.Memory[0xFF41]
-	lcdStatus := lcdEnabled()
+func loadBGTiles() *image.RGBA {
+	bg := image.NewRGBA(image.Rect(0, 0, 128, 128))
+	tiles := GbMMU.Memory[0x8000:0x9000]
+	const tileBytes = 16
 
-	if lcdStatus == 0 {
-		GbMMU.ScanlineCount = 456
-		GbMMU.Memory[0xFF44] = 0
-		status &= 252
-		status |= (1 << 0)
-		GbMMU.Memory[0xFF41] = status
-		return
+	palette := [4]color.RGBA{
+		color.RGBA{255, 255, 255, 255},
+		color.RGBA{170, 170, 170, 255},
+		color.RGBA{85, 85, 85, 255},
+		color.RGBA{0, 0, 0, 255},
 	}
 
-	currentLine := GbMMU.Memory[0xFF44]
-	var currentMode byte = status & 0x3
-	var mode byte
-	var reqInt byte
+	// Iterate over 8x8 tiles
+	for tile := 0; tile < 256; tile++ {
+		tileX := (tile % 16) * 8
+		tileY := (tile / 16) * 8
+		// Iterate over lines of tiles, represented by 2 bytes
+		for line := 0; line < 8; line++ {
+			hi := tiles[(tile*tileBytes)+line*2]
+			lo := tiles[(tile*tileBytes)+line*2+1]
 
-	// If true, in VBlank, set mode to 1
-	if currentLine >= 144 {
-		mode = 1
-		status |= (1 << 0)
-		mask := ^(1 << 1)
-		status &= byte(mask)
-		reqInt = status & (1 << 4)
-	} else {
-		var mode2Bounds int16 = 376
-		mode3Bounds := mode2Bounds - 172
+			// Iterate over individual pixels of tile lines
+			for pix := 0; pix < 8; pix++ {
+				hiBit := (hi >> (7 - uint8(pix))) & 1
+				loBit := (lo >> (7 - uint8(pix))) & 1
 
-		// If true, in mode 2
-		if GbMMU.ScanlineCount >= mode2Bounds {
-			mode = 2
-			status |= (1 << 1)
-			mask := ^(1 << 0)
-			status &= byte(mask)
-			reqInt = status & (1 << 5)
-		} else if GbMMU.ScanlineCount >= mode3Bounds {
-			mode = 3
-			status |= (1 << 1)
-			status |= (1 << 0)
-		} else {
-			mode = 0
-			mask := ^(1 << 1)
-			status &= byte(mask)
-			reqInt = status & (1 << 4)
+				colorIndex := loBit + hiBit*2
+				color := palette[colorIndex]
+
+				pixX := tileX + pix
+				pixY := tileY + line
+
+				bg.Set(pixX, pixY, color)
+			}
 		}
 	}
 
-	if (reqInt != 0) && (mode != currentMode) {
-		// TODO request interrupt
-	}
+	return bg
+}
 
-	// Check the coincidence flag
-	if GbMMU.Memory[0xFF44] == GbMMU.Memory[0xFF45] {
-		status |= (1 << 2)
-
-		if (status & (1 << 6)) != 0 {
-			// TODO request interrupt
+func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
+	switch gblcd.mode {
+	// OAM read mode
+	case 2:
+		if gblcd.modeClock >= 80 {
+			gblcd.modeClock = 0
+			gblcd.mode = 3
 		}
-	} else {
-		mask := ^(1 << 2)
-		status &= byte(mask)
-	}
+	// VRAM read mode
+	case 3:
+		if gblcd.modeClock >= 172 {
+			gblcd.modeClock = 0
+			gblcd.mode = 0
 
-	GbMMU.Memory[0xFF41] = status
+			// TODO Write scanline to framebuffer
+		}
+	// HBlank
+	case 0:
+		if gblcd.modeClock >= 204 {
+			gblcd.modeClock = 0
+			gblcd.currentLine++
+			GbMMU.Memory[LY]++
+
+			if gblcd.currentLine == 143 {
+				gblcd.mode = 1
+				// TODO draw image to screen
+				// gblcd.drawDebugTiles(screen)
+				// screen.Fill(color.RGBA{255, 255, 255, 255})
+			} else {
+				gblcd.mode = 2
+			}
+		}
+	// VBlank
+	case 1:
+		if gblcd.modeClock >= 456 {
+			gblcd.modeClock = 0
+			gblcd.currentLine++
+			GbMMU.Memory[LY]++
+
+			if gblcd.currentLine > 153 {
+				gblcd.mode = 2
+				gblcd.currentLine = 0
+				GbMMU.Memory[LY] = 0
+				// screen.Fill(color.RGBA{0, 0, 0, 255})
+			}
+		}
+	}
+}
+
+func (gblcd *GBLCD) drawDebugTiles(screen *ebiten.Image) {
+	// square, _ := ebiten.NewImage(32, 32, ebiten.FilterNearest)
+	// square.Fill(color.White)
+	// opts := &ebiten.DrawImageOptions{}
+	// opts.GeoM.Translate(200, float64(gblcd.modeClock))
+	// screen.DrawImage(square, opts)
+
+	// tiles := GbMMU.Memory[0x8300:0x8400]
 }

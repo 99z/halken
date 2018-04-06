@@ -9,9 +9,8 @@ import (
 // Reference http://gameboy.mongenel.com/dmg/asmmemmap.html
 type GBMMU struct {
 	// Array of bytes for contiguous memory access
-	Memory        [0xFFFF]byte
-	areas         map[string][]uint16
-	ScanlineCount int16
+	Memory [0xFFFF]byte
+	areas  map[string][]uint16
 }
 
 // Initial register values
@@ -58,8 +57,6 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.Memory[0xFF47] = 0xFC
 	gbmmu.Memory[0xFF48] = 0xFF
 	gbmmu.Memory[0xFF49] = 0xFF
-
-	gbmmu.ScanlineCount = 456
 }
 
 func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
@@ -67,6 +64,10 @@ func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
 	if addrInt >= 65535 {
 		addrInt--
 	}
+
+	// if addrInt >= 0x8000 && addrInt <= 0x97FF {
+	// 	fmt.Printf("Wrote to %04X\n", addrInt)
+	// }
 	gbmmu.Memory[addrInt] = data
 	// memLoc := addrInt & 0x0FFF
 }

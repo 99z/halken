@@ -136,8 +136,6 @@ func (gbcpu *GBCPU) RRr(reg *byte) {
 
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.clearHalfCarry()
-
-	gbcpu.Regs.Dump()
 }
 
 // RRHL -> e.g. RR (HL)
@@ -246,7 +244,6 @@ func (gbcpu *GBCPU) SRLr(reg *byte) {
 		gbcpu.Regs.clearCarry()
 	}
 
-	gbcpu.Regs.Dump()
 }
 
 // SRLHL -> e.g. SRL (HL)
