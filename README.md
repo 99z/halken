@@ -11,7 +11,11 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
 1. ~Implement CPU opcodes~
     * Non-CB opcodes implemented
         * Need to do second pass with comments, verify logic
-        * Write dispatch loop
-            * Don't need to have clock cycles, PC increments in actual instructions, can just put in dispatch loop and use struct fields
-2. Implement memory
-3. Test GB bootstrap ROM
+        * ~Write dispatch loop~
+2. ~Implement memory~
+3. ~Test GB bootstrap ROM~
+4. ~Draw tiles~
+
+   ![tile display](https://my.mixtape.moe/adxhwd.png)
+5. Draw background
+6. Graphics loop
