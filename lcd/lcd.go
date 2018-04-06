@@ -15,11 +15,18 @@ import (
 
 type GBLCD struct {
 	// 160*144 screen size, where each xy can be an RGBA value
-	screen    [23040]color.RGBA
-	mode      uint8
-	tileset   [2]byte
-	LineCount int16
+	screen      [23040]color.RGBA
+	mode        uint8
+	tileset     [2]byte
+	modeClock   int16
+	currentLine uint16
 }
+
+const (
+	LCDC = 0xFF40
+	STAT = 0xFF41
+	LY   = 0xFF44
+)
 
 func (gblcd *GBLCD) reset() {
 	// Initialize screen to white
@@ -27,7 +34,7 @@ func (gblcd *GBLCD) reset() {
 		gblcd.screen[i] = color.RGBA{255, 255, 255, 1}
 	}
 
-	gblcd.LineCount = 456
+	gblcd.modeClock = 456
 }
 
 const maxCycles = 69905
@@ -43,14 +50,14 @@ var (
 func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("%v", ebiten.CurrentFPS()))
 	// Logical update
-	gblcd.Update()
+	gblcd.Update(screen)
 
 	// Graphics update
 
 	return nil
 }
 
-func (gblcd *GBLCD) Update() {
+func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 	// Main loop
 	// 1. Execute next operation
 	// 2. Update total cycles
@@ -68,13 +75,12 @@ func (gblcd *GBLCD) Update() {
 
 		operation := GbMMU.Memory[opcodeInt]
 
-		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
+		//fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 		delay := GbCPU.Instrs[operation].Executor()
-		fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
-		fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
+		//fmt.Printf("LCD STAT: %02X\n", GbMMU.Memory[0xFF41])
+		//fmt.Printf("LY: %02X\n", GbMMU.Memory[0xFF44])
 
 		if opcode[0] == 68 && opcode[1] == 203 {
-			fmt.Println(GbMMU.Memory[40960:40963])
 			os.Exit(0)
 		}
 
@@ -82,7 +88,7 @@ func (gblcd *GBLCD) Update() {
 		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 
 		// Update graphics
-		gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles) + delay)
+		gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
 
 		if GbCPU.Jumped {
 			continue
@@ -97,105 +103,63 @@ func (gblcd *GBLCD) Update() {
 	}
 }
 
-func (gblcd *GBLCD) updateGraphics(cycles int) {
-	gblcd.setLCDStatus()
-
-	if lcdEnabled() != 0 {
-		gblcd.LineCount -= int16(cycles)
-	} else {
-		return
-	}
-
-	if gblcd.LineCount <= 0 {
-		GbMMU.Memory[0xFF44]++
-		gblcd.LineCount += 456
-
-		if GbMMU.Memory[0xFF44] > 153 {
-			GbMMU.Memory[0xFF44] = 0
-			gblcd.mode = 2
-		}
-	}
+func (gblcd *GBLCD) updateGraphics(cycles int, screen *ebiten.Image) {
+	gblcd.modeClock += int16(cycles)
+	gblcd.setLCDStatus(screen)
 }
 
 func lcdEnabled() byte {
-	return GbMMU.Memory[0xFF40] & (1 << 7)
+	return GbMMU.Memory[STAT] & (1 << 7)
 }
 
-// Good info on setting LCD status
-// http://www.codeslinger.co.uk/pages/projects/gameboy/lcd.html
-func (gblcd *GBLCD) setLCDStatus() {
-	// Get value of LCD status
-	status := GbMMU.Memory[0xFF41]
-	lcdStatus := lcdEnabled()
-
-	if lcdStatus == 0 {
-		gblcd.LineCount = 456
-		GbMMU.Memory[0xFF44] = 0
-		status &= 252
-		status |= (1 << 0)
-		GbMMU.Memory[0xFF41] = status
-		return
-	}
-
-	currentLine := GbMMU.Memory[0xFF44]
-	var currentMode byte = status & 0x3
-	var mode byte
-	var reqInt byte
-
-	if currentLine >= 144 {
-		// VBlank
-		gblcd.mode = 1
-		status |= (1 << 0)
-		mask := ^(1 << 1)
-		status &= byte(mask)
-		reqInt = status & (1 << 4)
-	} else {
-		var mode2Bounds int16 = 376
-		mode3Bounds := mode2Bounds - 172
-
-		if gblcd.LineCount >= mode2Bounds {
-			// OAM read mode
-			gblcd.mode = 2
-			status |= (1 << 1)
-			mask := ^(1 << 0)
-			status &= byte(mask)
-			reqInt = status & (1 << 5)
-		} else if gblcd.LineCount >= mode3Bounds {
-			// VRAM read mode
+func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
+	switch gblcd.mode {
+	// OAM read mode
+	case 2:
+		if gblcd.modeClock >= 80 {
+			gblcd.modeClock = 0
 			gblcd.mode = 3
-			status |= (1 << 1)
-			status |= (1 << 0)
-
-			// TODO Write a scanline to the framebuffer
-		} else {
-			// HBlank
+		}
+	// VRAM read mode
+	case 3:
+		if gblcd.modeClock >= 172 {
+			gblcd.modeClock = 0
 			gblcd.mode = 0
-			mask := ^(1 << 1)
-			status &= byte(mask)
-			reqInt = status & (1 << 4)
 
-			if gblcd.LineCount == 143 {
+			// TODO Write scanline to framebuffer
+		}
+	// HBlank
+	case 0:
+		if gblcd.modeClock >= 204 {
+			gblcd.modeClock = 0
+			gblcd.currentLine++
+			GbMMU.Memory[LY]++
+
+			if gblcd.currentLine == 143 {
 				gblcd.mode = 1
-				// TODO Write data to screen
+				// TODO draw image to screen
+				// screen.Fill(color.RGBA{255, 255, 255, 255})
+			} else {
+				gblcd.mode = 2
+			}
+		}
+	// VBlank
+	case 1:
+		if gblcd.modeClock >= 456 {
+			gblcd.modeClock = 0
+			gblcd.currentLine++
+			GbMMU.Memory[LY]++
+
+			if gblcd.currentLine > 153 {
+				gblcd.mode = 2
+				gblcd.currentLine = 0
+				GbMMU.Memory[LY] = 0
+				// screen.Fill(color.RGBA{0, 0, 0, 255})
 			}
 		}
 	}
+}
 
-	if (reqInt != 0) && (mode != currentMode) {
-		// TODO request interrupt
-	}
+func (gblcd *GBLCD) drawScanline() {
 
-	// Check the coincidence flag
-	if GbMMU.Memory[0xFF44] == GbMMU.Memory[0xFF45] {
-		status |= (1 << 2)
-
-		if (status & (1 << 6)) != 0 {
-			// TODO request interrupt
-		}
-	} else {
-		mask := ^(1 << 2)
-		status &= byte(mask)
-	}
-
-	GbMMU.Memory[0xFF41] = status
 }
