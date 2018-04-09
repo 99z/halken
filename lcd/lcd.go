@@ -50,10 +50,11 @@ var (
 func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	// Logical update
 	gblcd.Update(screen)
-	bgTiles := loadBGTiles()
-	ebitenBG, _ := ebiten.NewImageFromImage(bgTiles, ebiten.FilterDefault)
+	tiles := loadTilesDebug(0x8000, 0x9000)
+	ebitenTiles, _ := ebiten.NewImageFromImage(tiles, ebiten.FilterDefault)
 	opts := &ebiten.DrawImageOptions{}
-	screen.DrawImage(ebitenBG, opts)
+	opts.GeoM.Translate(160, 0)
+	screen.DrawImage(ebitenTiles, opts)
 
 	// Graphics update
 
@@ -117,9 +118,12 @@ func lcdEnabled() byte {
 	return GbMMU.Memory[STAT] & (1 << 7)
 }
 
-func loadBGTiles() *image.RGBA {
+func loadTilesDebug(beg, end int) *image.RGBA {
 	bg := image.NewRGBA(image.Rect(0, 0, 128, 128))
-	tiles := GbMMU.Memory[0x8000:0x9000]
+	// Tile set #1: 0x8000 - 0x87FF
+	// Tile map #0: 0x9800 - 0x9BFF
+	// Complete list: http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-Graphics
+	tiles := GbMMU.Memory[beg:end]
 	const tileBytes = 16
 
 	palette := [4]color.RGBA{
@@ -130,7 +134,8 @@ func loadBGTiles() *image.RGBA {
 	}
 
 	// Iterate over 8x8 tiles
-	for tile := 0; tile < 256; tile++ {
+	numTiles := (end - beg) / 16
+	for tile := 0; tile < numTiles; tile++ {
 		tileX := (tile % 16) * 8
 		tileY := (tile / 16) * 8
 		// Iterate over lines of tiles, represented by 2 bytes
