@@ -25,27 +25,30 @@ func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 
 // LDSPHL -> e.g. LD SP,HL
 // Loads bytes from register pair HL into SP
-func (gbcpu *GBCPU) LDSPHL(reg1, reg2 *byte) {
-	gbcpu.Regs.sp = []byte{*reg2, *reg1}
+func (gbcpu *GBCPU) LDSPHL() {
+	gbcpu.Regs.sp = []byte{gbcpu.Regs.l, gbcpu.Regs.h}
 }
 
 // LDrrSPs -> e.g. LD BC,SP+s8
 // Loads value of SP + signed 8-bit value into register pair
-func (gbcpu *GBCPU) LDrrSPs(reg1, reg2 *byte) {
-	operand := gbcpu.getOperands(1)
+func (gbcpu *GBCPU) LDHLSPs() {
+	operand := gbcpu.getOperands(1)[0]
 	// Get SP as a 16-bit int, add operand to it
-	val := gbcpu.sliceToInt(gbcpu.Regs.sp) + uint16(operand[0])
-	gbcpu.Regs.writePairFromInt(reg1, reg2, val)
+	val := gbcpu.sliceToInt(gbcpu.Regs.sp) + uint16(operand)
+	valBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(valBytes, val)
+	gbcpu.Regs.h = valBytes[0]
+	gbcpu.Regs.l = valBytes[1]
 
 	// HC and C are a little weird for this instruction
 	// https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
 	if val >= 0 {
-		newHC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xFF) + uint16(operand[0])) > 0xFF
+		newHC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xFF) + uint16(operand)) > 0xFF
 		var newHCVal uint8
 		if newHC {
 			newHCVal = 1
 		}
-		newC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xF) + (uint16(operand[0]) & 0xF)) > 0xF
+		newC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xF) + (uint16(operand) & 0xF)) > 0xF
 		var newCVal uint8
 		if newC {
 			newCVal = 1
@@ -173,8 +176,9 @@ func (gbcpu *GBCPU) DECr(reg *byte) {
 }
 
 func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
-	*reg1--
-	*reg2--
+	rr := gbcpu.Regs.JoinRegs(reg1, reg2)
+	rr--
+	*reg1, *reg2 = gbcpu.Regs.SplitWord(rr)
 }
 
 // RLCA performs 8-bit rotation to the left
@@ -342,21 +346,21 @@ func (gbcpu *GBCPU) ADDrr(reg1, reg2 *byte) {
 // Values of reg and i8 are added together
 // Result is written into reg
 // Flags: Z0HC
-func (gbcpu *GBCPU) ADDrn(reg *byte) {
-	oldVal := *reg
+func (gbcpu *GBCPU) ADDAn() {
+	oldVal := gbcpu.Regs.a
 	operand := gbcpu.getOperands(1)[0]
-	hc := (((*reg & 0xf) + (operand & 0xf)) & 0x10) == 0x10
-	*reg = *reg + operand
+	hc := (((gbcpu.Regs.a & 0xf) + (operand & 0xf)) & 0x10) == 0x10
+	gbcpu.Regs.a = gbcpu.Regs.a + operand
 
 	// Check for zero
-	if *reg == 0x0 {
+	if gbcpu.Regs.a == 0x0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
 	}
 
 	// Check for carry
-	if *reg < oldVal {
+	if gbcpu.Regs.a < oldVal {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -379,23 +383,22 @@ func (gbcpu *GBCPU) ADDrn(reg *byte) {
 // Values of operand and carry flag are added to reg
 // Result is written into reg
 // Flags: Z0HC
-func (gbcpu *GBCPU) ADCrn(reg *byte) {
-
-	oldVal := *reg
+func (gbcpu *GBCPU) ADCAn() {
+	oldVal := gbcpu.Regs.a
 	operand := gbcpu.getOperands(1)[0]
-	result := (operand + gbcpu.Regs.getCarry()) + gbcpu.Regs.a
+	// result := (operand + gbcpu.Regs.getCarry()) + gbcpu.Regs.a
 	hc := (((operand & 0xf) + (gbcpu.Regs.getCarry() & 0xf) + (gbcpu.Regs.a & 0xf)) & 0x10) == 0x10
-	*reg = result
+	gbcpu.Regs.a += operand + gbcpu.Regs.getCarry()
 
 	// Check for zero
-	if *reg == 0x0 {
+	if gbcpu.Regs.a == 0x0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
 	}
 
 	// Check for carry
-	if *reg < oldVal {
+	if gbcpu.Regs.a < oldVal {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -420,39 +423,28 @@ func (gbcpu *GBCPU) ADCrn(reg *byte) {
 // Result is written into reg1
 // Flags: Z0HC
 func (gbcpu *GBCPU) ADCrr(reg1, reg2 *byte) {
-	oldVal := *reg1
-	result := *reg1 + *reg2 + gbcpu.Regs.getCarry()
-	hc := (((*reg1 & 0xf) + (*reg2 & 0xf) + (gbcpu.Regs.getCarry() & 0xf)) & 0x10) == 0x10
-	*reg1 = result
+	carry := int(gbcpu.Regs.getCarry())
 
-	// Don't think this is needed
-	// Can just check for carry/hc with actual result
-	// sum := (*reg1 & 0xF) + (*reg2 & 0xF)
-
-	// Check for zero
-	if *reg1 == 0x0 {
-		gbcpu.Regs.setZero()
+	if ((int(*reg1) & 0xF) + (int(*reg2) & 0xF) + carry) > 0xF {
+		gbcpu.Regs.setHalfCarry()
 	} else {
-		gbcpu.Regs.clearZero()
+		gbcpu.Regs.clearHalfCarry()
 	}
 
-	// Check for carry
-	if *reg1 < oldVal {
+	if ((int(*reg1) & 0xFF) + (int(*reg2) & 0xFF) + carry) > 0xFF {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
-	// Check for half carry
-	if hc {
-		// Half-carry occurred
-		gbcpu.Regs.setHalfCarry()
+	*reg1 += *reg2 + byte(carry)
+
+	if *reg1 == 0 {
+		gbcpu.Regs.setZero()
 	} else {
-		// Half-carry did not occur
-		gbcpu.Regs.clearHalfCarry()
+		gbcpu.Regs.clearZero()
 	}
 
-	// Set subtract flag to zero
 	gbcpu.Regs.clearSubtract()
 }
 
@@ -531,14 +523,14 @@ func (gbcpu *GBCPU) ADDraa(reg, a1, a2 *byte) {
 // Result is written into HL
 // Flags: -0HC
 func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
-	hlInt := gbcpu.sliceToInt([]byte{gbcpu.Regs.h, gbcpu.Regs.l})
-	rrInt := gbcpu.sliceToInt([]byte{*reg1, *reg2})
+	// hlInt := gbcpu.sliceToInt([]byte{gbcpu.Regs.h, gbcpu.Regs.l})
+	// rrInt := gbcpu.sliceToInt([]byte{*reg1, *reg2})
+	hlInt := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
+	rrInt := gbcpu.Regs.JoinRegs(reg1, reg2)
 	sum := rrInt + hlInt
 	hc := (((rrInt & 0xf) + (hlInt & 0xf)) & 0x10) == 0x10
 
-	newH := gbcpu.Regs.h + *reg1
-	newL := gbcpu.Regs.l + *reg2
-	gbcpu.Regs.writePair(&gbcpu.Regs.h, &gbcpu.Regs.l, []byte{newH, newL})
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(sum)
 
 	// Check for carry
 	if sum < hlInt {
@@ -555,6 +547,8 @@ func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
 		// Half-carry did not occur
 		gbcpu.Regs.clearHalfCarry()
 	}
+
+	gbcpu.Regs.clearSubtract()
 }
 
 // ADDSPs -> e.g. ADD SP,s8
@@ -562,34 +556,57 @@ func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
 // Sets SP to new value
 // Flags: 00HC
 func (gbcpu *GBCPU) ADDSPs() {
-	oldVal := gbcpu.sliceToInt(gbcpu.Regs.sp)
 	operand := gbcpu.getOperands(1)[0]
-	val := uint16(operand) + gbcpu.sliceToInt(gbcpu.Regs.sp)
-	hc := (((uint16(operand) & 0xf) + (gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xf)) & 0x10) == 0x10
-	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, val)
+	sp := binary.LittleEndian.Uint16(gbcpu.Regs.sp)
+	var result uint16
 
-	// Check for carry
-	if val < oldVal {
+	if operand > 127 {
+		result = sp - uint16(operand)
+	} else {
+		result = sp + uint16(operand)
+	}
+
+	check := (sp ^ uint16(operand) ^ (sp+uint16(operand))&0xFFFF)
+
+	if (check & 0x100) == 0x100 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
-	// Check for half carry
-	if hc {
-		// Half-carry occurred
+	if (check & 0x10) == 0x10 {
 		gbcpu.Regs.setHalfCarry()
 	} else {
-		// Half-carry did not occur
 		gbcpu.Regs.clearHalfCarry()
 	}
+
+	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, result)
 
 	gbcpu.Regs.clearZero()
 	gbcpu.Regs.clearSubtract()
 }
 
-func (gbcpu *GBCPU) ADDrrSP(reg1, reg2 *byte) {
-	gbcpu.Regs.writePair(reg1, reg2, []byte{gbcpu.Regs.sp[0], gbcpu.Regs.sp[1]})
+// Flags: -0HC
+func (gbcpu *GBCPU) ADDHLSP() {
+	hl := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
+	sp := binary.LittleEndian.Uint16(gbcpu.Regs.sp)
+	result := hl + sp
+
+	if result < hl {
+		gbcpu.Regs.setCarry()
+	} else {
+		gbcpu.Regs.clearCarry()
+	}
+
+	if (result^sp^hl)&0x1000 == 0x1000 {
+		gbcpu.Regs.setHalfCarry()
+	} else {
+		gbcpu.Regs.clearHalfCarry()
+	}
+
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(result)
+
+	gbcpu.Regs.clearSubtract()
 }
 
 // ANDr -> e.g. AND B
@@ -789,7 +806,6 @@ func (gbcpu *GBCPU) SUBn() {
 
 	// Set subtract flag
 	gbcpu.Regs.setSubtract()
-
 }
 
 // SUBr -> e.g. SUB B
@@ -979,7 +995,6 @@ func (gbcpu *GBCPU) SBCraa(reg, a1, a2 *byte) {
 // Only updates flags
 // Flags: Z1HC
 func (gbcpu *GBCPU) CPr(reg *byte) {
-	oldVal := *reg
 	sub := gbcpu.Regs.a - *reg
 	hc := (((gbcpu.Regs.a & 0xf) - (*reg & 0xf)) & 0x10) == 0x10
 
@@ -991,7 +1006,7 @@ func (gbcpu *GBCPU) CPr(reg *byte) {
 	}
 
 	// Check for carry
-	if sub > oldVal {
+	if gbcpu.Regs.a < *reg {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -1149,7 +1164,7 @@ func (gbcpu *GBCPU) LDrffn(reg *byte) {
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
 	operand := gbcpu.getOperands(1)[0]
-	GbMMU.WriteByte([]byte{*reg1, *reg2}, operand)
+	GbMMU.WriteByte([]byte{*reg2, *reg1}, operand)
 }
 
 func (gbcpu *GBCPU) LDDaaR(a1, a2, reg *byte) {
@@ -1382,9 +1397,16 @@ func (gbcpu *GBCPU) JRNCn() int {
 	return 0
 }
 
+// Flags: -00C
 func (gbcpu *GBCPU) CCF() {
-	// TODO
-	// Inverts the carry flag
+	if gbcpu.Regs.getCarry() != 0 {
+		gbcpu.Regs.clearCarry()
+	} else {
+		gbcpu.Regs.setCarry()
+	}
+
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
 }
 
 func (gbcpu *GBCPU) DAA() {
@@ -1392,14 +1414,19 @@ func (gbcpu *GBCPU) DAA() {
 	// Reference: http://forums.nesdev.com/viewtopic.php?t=9088
 }
 
+// Flags: -001
 func (gbcpu *GBCPU) SCF() {
-	// TODO
-	// Set carry flag
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
+	gbcpu.Regs.setCarry()
 }
 
 // Bitwise complement of A
+// Flags: -11-
 func (gbcpu *GBCPU) CPL() {
 	gbcpu.Regs.a = ^gbcpu.Regs.a
+	gbcpu.Regs.setSubtract()
+	gbcpu.Regs.setHalfCarry()
 }
 
 // RET pops the top of the stack into the program counter
@@ -1466,14 +1493,6 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 	*reg2 = b1
 
 }
-
-// func (gbcpu *GBCPU) POPHL(reg1, reg2 *byte) {
-// 	b1 := gbcpu.popByteFromStack()
-// 	b2 := gbcpu.popByteFromStack()
-// 	*reg1 = b1
-// 	*reg2 = b2
-//
-// }
 
 func (gbcpu *GBCPU) EI() {
 	// TODO

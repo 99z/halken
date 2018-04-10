@@ -58,8 +58,8 @@ func (regs *Registers) writePairFromInt(reg1, reg2 *byte, data uint16) {
 	*reg2 = splitInt[0]
 }
 
-func (regs *Registers) readPair(reg1, reg2 *byte) [2]byte {
-	return [2]byte{*reg1, *reg2}
+func (regs *Registers) readPair(reg1, reg2 *byte) []byte {
+	return []byte{*reg1, *reg2}
 }
 
 func (regs *Registers) incrementHL(amt uint8) {
@@ -82,6 +82,14 @@ func (regs *Registers) incrementPair(reg1, reg2 *byte, amt uint8) {
 	} else {
 		*reg2 = newL
 	}
+}
+
+func (regs *Registers) SplitWord(rr uint16) (byte, byte) {
+	return byte(rr >> 8), byte(rr)
+}
+
+func (regs *Registers) JoinRegs(reg1, reg2 *byte) uint16 {
+	return uint16(*reg2) | uint16(*reg1)<<8
 }
 
 // incrementSP converts current SP to an integer,
