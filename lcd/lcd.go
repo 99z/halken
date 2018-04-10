@@ -20,6 +20,7 @@ type GBLCD struct {
 	tileset     [2]byte
 	modeClock   int16
 	currentLine uint16
+	window      *image.RGBA
 	currentBG   *image.RGBA
 }
 
@@ -56,10 +57,12 @@ var (
 	second = time.Tick(time.Second)
 )
 
+// Set offsets to uint8s, just add and let it overflow
+// Linear offset in bg map of first tile in window
+// ((y offset * num pixels per row) + (x offset * 8)) / 8
 func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	// Logical update
 	gblcd.Update(screen)
-	//screen.Fill(color.White)
 	// tiles := loadTilesDebug(0x8000, 0x9000)
 	// ebitenTiles, _ := ebiten.NewImageFromImage(tiles, ebiten.FilterDefault)
 	// opts := &ebiten.DrawImageOptions{}
@@ -71,9 +74,13 @@ func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	// testOpts := &ebiten.DrawImageOptions{}
 	// screen.DrawImage(ebiTest, testOpts)
 
-	gblcd.renderBackground(GbMMU.Memory[0x9800:0x9C00])
-	bg := gblcd.currentBG
-	ebitenBG, _ := ebiten.NewImageFromImage(bg, ebiten.FilterDefault)
+	// scy := int(GbMMU.Memory[SCY])
+	// scx := int(GbMMU.Memory[SCX])
+	// gblcd.renderBackground(GbMMU.Memory[0x9800:0x9C00])
+
+	gblcd.renderWindow(GbMMU.Memory[0x9800:0x9C00])
+
+	ebitenBG, _ := ebiten.NewImageFromImage(gblcd.window, ebiten.FilterDefault)
 	opts := &ebiten.DrawImageOptions{}
 	screen.DrawImage(ebitenBG, opts)
 
@@ -182,6 +189,48 @@ func loadTilesDebug(beg, end int) *image.RGBA {
 	return bg
 }
 
+func (gblcd *GBLCD) renderWindow(bgmap []byte) {
+	// ((y tile offset * num pixels per row) + (x tile offset * 8)) / 8
+	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
+	var tiles [][]*Pixel
+
+	var yVal byte = GbMMU.Memory[SCY]
+	var xVal byte = GbMMU.Memory[SCX]
+	var initialX byte = GbMMU.Memory[SCX]
+	yOff := int(yVal) * 256
+	xOff := int(xVal) * 8
+	offset := (yOff + xOff) / 64
+
+	for height := 0; height < 18; height++ {
+		for width := 0; width < 20; width++ {
+			tile := renderTile(int(bgmap[offset]) * 16)
+			tiles = append(tiles, tile)
+
+			// Move to the next tile
+			xVal += 8
+			xOff = int(xVal) * 8
+
+			offset = (yOff + xOff) / 64
+		}
+
+		yVal += 8
+		yOff = int(yVal) * 256
+		xVal = initialX
+		xOff = int(xVal) * 8
+		offset = (yOff + xOff) / 64
+	}
+
+	for i, tile := range tiles {
+		for _, px := range tile {
+			tileX := ((i % 20) * 8)
+			tileY := ((i / 20) * 8)
+			window.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
+		}
+	}
+
+	gblcd.window = window
+}
+
 // BG map is 32*32 bytes, each references a tile
 func (gblcd *GBLCD) renderBackground(bgmap []byte) {
 	bg := image.NewRGBA(image.Rect(0, 0, 256, 256))
@@ -196,8 +245,8 @@ func (gblcd *GBLCD) renderBackground(bgmap []byte) {
 
 	for i, tile := range tiles {
 		for _, px := range tile {
-			tileX := (i % 32) * 8
-			tileY := (i / 32) * 8
+			tileX := ((i % 32) * 8)
+			tileY := ((i / 32) * 8)
 			bg.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
 		}
 	}
