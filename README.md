@@ -12,6 +12,21 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
     * ~Non-CB opcodes implemented~
      * ~Write dispatch loop~
      * Use blargg's test output to fix instructions
+      * 01 - special
+      * 02 - interrupts
+      * 03 - op sp,hl
+      * 04 - op r,imm
+      * 05 - op rp
+      * ~06 - ld r,r~
+      
+      ![pass 6](https://my.mixtape.moe/mfdkmk.png)
+      * 07 - jr,jp,call,ret,rst
+      * 08 - misc instrs
+      * 09 - op r,r
+      * ~10 - bit ops~
+      
+      ![pass 10](https://my.mixtape.moe/ysxqrh.png)
+      * 11 - op a,(hl)
 2. ~Implement memory~
 3. ~Test GB bootstrap ROM~
 4. ~Draw tiles~
@@ -19,5 +34,3 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
    ![tile display](https://my.mixtape.moe/adxhwd.png)
 5. ~Draw background~
 6. ~Graphics loop~
-
-   ![graphics](https://my.mixtape.moe/mfdkmk.png)
