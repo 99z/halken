@@ -9,13 +9,15 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
 ## TODO
 
 1. ~Implement CPU opcodes~
-    * Non-CB opcodes implemented
-        * Need to do second pass with comments, verify logic
-        * ~Write dispatch loop~
+    * ~Non-CB opcodes implemented~
+     * ~Write dispatch loop~
+     * Use blargg's test output to fix instructions
 2. ~Implement memory~
 3. ~Test GB bootstrap ROM~
 4. ~Draw tiles~
 
    ![tile display](https://my.mixtape.moe/adxhwd.png)
-5. Draw background
-6. Graphics loop
+5. ~Draw background~
+6. ~Graphics loop~
+
+   ![graphics](https://my.mixtape.moe/mfdkmk.png)
