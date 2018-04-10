@@ -31,44 +31,32 @@ func (gbcpu *GBCPU) LDSPHL() {
 
 // LDrrSPs -> e.g. LD BC,SP+s8
 // Loads value of SP + signed 8-bit value into register pair
+// HC and C are a little weird for this instruction
+// https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
 func (gbcpu *GBCPU) LDHLSPs() {
 	operand := gbcpu.getOperands(1)[0]
-	// Get SP as a 16-bit int, add operand to it
-	val := gbcpu.sliceToInt(gbcpu.Regs.sp) + uint16(operand)
-	valBytes := make([]byte, 2)
-	binary.LittleEndian.PutUint16(valBytes, val)
-	gbcpu.Regs.h = valBytes[0]
-	gbcpu.Regs.l = valBytes[1]
+	operand = (operand ^ 0x80) - 0x80
+	sp := binary.LittleEndian.Uint16(gbcpu.Regs.sp)
+	result := sp + uint16(operand)
 
-	// HC and C are a little weird for this instruction
-	// https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
-	if val >= 0 {
-		newHC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xFF) + uint16(operand)) > 0xFF
-		var newHCVal uint8
-		if newHC {
-			newHCVal = 1
-		}
-		newC := ((gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xF) + (uint16(operand) & 0xF)) > 0xF
-		var newCVal uint8
-		if newC {
-			newCVal = 1
-		}
-		gbcpu.Regs.f |= (newHCVal << 4)
-		gbcpu.Regs.f |= (newCVal << 5)
+	check := sp ^ result ^ uint16(operand)
+
+	if (check & 0x100) == 0x100 {
+		gbcpu.Regs.setCarry()
 	} else {
-		newHC := (val & 0xFF) <= (gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xFF)
-		var newHCVal uint8
-		if newHC {
-			newHCVal = 1
-		}
-		newC := (val & 0xF) <= (gbcpu.sliceToInt(gbcpu.Regs.sp) & 0xF)
-		var newCVal uint8
-		if newC {
-			newCVal = 1
-		}
-		gbcpu.Regs.f |= (newHCVal << 4)
-		gbcpu.Regs.f |= (newCVal << 5)
+		gbcpu.Regs.clearCarry()
 	}
+
+	if (check & 0x10) == 0x10 {
+		gbcpu.Regs.setHalfCarry()
+	} else {
+		gbcpu.Regs.clearHalfCarry()
+	}
+
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(result)
+
+	gbcpu.Regs.clearZero()
+	gbcpu.Regs.clearSubtract()
 }
 
 // LDrn -> e.g. LD B,i8
@@ -557,16 +545,11 @@ func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
 // Flags: 00HC
 func (gbcpu *GBCPU) ADDSPs() {
 	operand := gbcpu.getOperands(1)[0]
+	operand = (operand ^ 0x80) - 0x80
 	sp := binary.LittleEndian.Uint16(gbcpu.Regs.sp)
-	var result uint16
+	result := sp + uint16(operand)
 
-	if operand > 127 {
-		result = sp - uint16(operand)
-	} else {
-		result = sp + uint16(operand)
-	}
-
-	check := (sp ^ uint16(operand) ^ (sp+uint16(operand))&0xFFFF)
+	check := sp ^ result ^ uint16(operand)
 
 	if (check & 0x100) == 0x100 {
 		gbcpu.Regs.setCarry()
