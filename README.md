@@ -14,7 +14,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
      * Use blargg's test output to fix instructions
       * 01 - special
       * 02 - interrupts
-      * 03 - op sp,hl
+      * ~03 - op sp,hl~
+      
+      ![pass 3](https://my.mixtape.moe/gpwxlx.png)
       * ~04 - op r,imm~
       
       ![pass 4](https://my.mixtape.moe/glzofz.png)
