@@ -181,10 +181,10 @@ func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
 // Z80 does not modify Z, other emulator sources do
 // Reference: https://hax.iimarckus.org/topic/1617/
 func (gbcpu *GBCPU) RLCA() {
-	carry := gbcpu.Regs.a << 1
-	gbcpu.Regs.a = (carry | carry>>7)
+	carry := gbcpu.Regs.a >> 7
+	gbcpu.Regs.a = (gbcpu.Regs.a<<1 | carry)
 
-	if carry != 0x0 {
+	if carry != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -230,10 +230,10 @@ func (gbcpu *GBCPU) RLA() {
 // GB opcodes list show Z being set to zero, but other sources disagree
 // Z80 does not modify Z, other emulator sources do
 func (gbcpu *GBCPU) RRCA() {
-	carry := gbcpu.Regs.a >> 1
-	gbcpu.Regs.a = (carry | carry<<7)
+	carry := gbcpu.Regs.a << 7
+	gbcpu.Regs.a = (gbcpu.Regs.a>>1 | carry)
 
-	if carry != 0x0 {
+	if carry != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -763,33 +763,26 @@ func (gbcpu *GBCPU) XORaa(a1, a2 *byte) {
 // Result is written into reg
 // Flags: Z1HC
 func (gbcpu *GBCPU) SUBn() {
-	oldVal := gbcpu.Regs.a
 	operand := gbcpu.getOperands(1)[0]
-	result := gbcpu.Regs.a - operand
-	hc := (((gbcpu.Regs.a & 0xf) - (operand & 0xf)) & 0x10) == 0x10
-	gbcpu.Regs.a = result
 
-	// Check for zero
-	if gbcpu.Regs.a == 0x0 {
-		gbcpu.Regs.setZero()
-	} else {
-		gbcpu.Regs.clearZero()
-	}
-
-	// Check for carry
-	if gbcpu.Regs.a > oldVal {
+	if (int(gbcpu.Regs.a) & 0xFF) < (int(operand) & 0xFF) {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
-	// Check for half carry
-	if hc {
-		// Half-carry occurred
+	if (int(gbcpu.Regs.a) & 0xF) < (int(operand) & 0xF) {
 		gbcpu.Regs.setHalfCarry()
 	} else {
-		// Half-carry did not occur
 		gbcpu.Regs.clearHalfCarry()
+	}
+
+	gbcpu.Regs.a -= operand
+
+	if gbcpu.Regs.a == 0 {
+		gbcpu.Regs.setZero()
+	} else {
+		gbcpu.Regs.clearZero()
 	}
 
 	// Set subtract flag
@@ -801,34 +794,27 @@ func (gbcpu *GBCPU) SUBn() {
 // Result is written into reg
 // Flags: Z1HC
 func (gbcpu *GBCPU) SUBr(reg *byte) {
-	oldVal := *reg
-	hc := (((gbcpu.Regs.a & 0xf) - (*reg & 0xf)) & 0x10) == 0x10
-	*reg = gbcpu.Regs.a - *reg
-
-	// Check for zero
-	if *reg == 0x0 {
-		gbcpu.Regs.setZero()
-	} else {
-		gbcpu.Regs.clearZero()
-	}
-
-	// Check for carry
-	if *reg > oldVal {
+	if (int(gbcpu.Regs.a) & 0xFF) < (int(*reg) & 0xFF) {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
-	// Check for half carry
-	if hc {
-		// Half-carry occurred
+	if (int(gbcpu.Regs.a) & 0xF) < (int(*reg) & 0xF) {
 		gbcpu.Regs.setHalfCarry()
 	} else {
-		// Half-carry did not occur
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	// Set subtract flag to zero
+	gbcpu.Regs.a -= *reg
+
+	if gbcpu.Regs.a == 0 {
+		gbcpu.Regs.setZero()
+	} else {
+		gbcpu.Regs.clearZero()
+	}
+
+	// Set subtract flag
 	gbcpu.Regs.setSubtract()
 }
 
@@ -871,36 +857,31 @@ func (gbcpu *GBCPU) SUBaa(a1, a2 *byte) {
 // Result is written into reg1
 // Flags: Z1HC
 func (gbcpu *GBCPU) SBCrr(reg1, reg2 *byte) {
-	oldVal := *reg1
-	sum := *reg2 + gbcpu.Regs.getCarry()
-	result := *reg1 - sum
-	hc := (((*reg1 & 0xf) - (sum & 0xf)) & 0x10) == 0x10
-	*reg1 = result
+	carry := gbcpu.Regs.getCarry()
+	result := (int(*reg1) - int(*reg2)) - int(carry)
 
-	// Check for zero
-	if *reg1 == 0x0 {
-		gbcpu.Regs.setZero()
-	} else {
-		gbcpu.Regs.clearZero()
-	}
-
-	// Check for carry
-	if *reg1 > oldVal {
+	if result < 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
-	// Check for half carry
-	if hc {
-		// Half-carry occurred
+	result &= 0xFF
+
+	if result == 0x0 {
+		gbcpu.Regs.setZero()
+	} else {
+		gbcpu.Regs.clearZero()
+	}
+
+	if ((result ^ int(*reg1) ^ int(*reg2)) & 0x10) == 0x10 {
 		gbcpu.Regs.setHalfCarry()
 	} else {
-		// Half-carry did not occur
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	// Set subtract flag to zero
+	*reg1 = byte(result)
+
 	gbcpu.Regs.setSubtract()
 }
 

@@ -12,16 +12,16 @@ import (
 // Rotated bit is copied to carry
 // Flags: Z00C
 func (gbcpu *GBCPU) RLCr(reg *byte) {
-	carry := *reg << 1
-	*reg = (carry | carry>>7)
+	carry := *reg >> 7
+	*reg = (*reg<<1 | carry)
 
-	if *reg == 0x0 {
+	if *reg == 0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
 	}
 
-	if carry != 0x0 {
+	if carry != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -44,16 +44,16 @@ func (gbcpu *GBCPU) RLCHL() {
 // Rotated bit is copied to carry
 // Flags: Z00C
 func (gbcpu *GBCPU) RRCr(reg *byte) {
-	carry := *reg >> 1
-	*reg = (carry | carry<<7)
+	carry := *reg << 7
+	*reg = (*reg>>1 | carry)
 
-	if *reg == 0x0 {
+	if *reg == 0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
 	}
 
-	if carry != 0x0 {
+	if carry != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -81,13 +81,13 @@ func (gbcpu *GBCPU) RLr(reg *byte) {
 	oldCarry := gbcpu.Regs.getCarry()
 	*reg = ((*reg << 1) | oldCarry)
 
-	if *reg == 0x0 {
+	if *reg == 0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
 	}
 
-	if carry != 0x0 {
+	if carry != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -95,7 +95,6 @@ func (gbcpu *GBCPU) RLr(reg *byte) {
 
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.clearHalfCarry()
-	gbcpu.Regs.clearZero()
 }
 
 // RLHL -> e.g. RL (HL)
@@ -111,27 +110,20 @@ func (gbcpu *GBCPU) RLHL() {
 // Rotates register right through CF
 // Flags: Z00C
 func (gbcpu *GBCPU) RRr(reg *byte) {
-	msBit := 0
-	if *reg&0x01 == 0x01 {
-		msBit = 1
-	}
+	carry := gbcpu.Regs.getCarry()
 
-	*reg = *reg >> 1
-
-	if *reg == 0x0 {
-		gbcpu.Regs.setZero()
-	} else {
-		gbcpu.Regs.clearZero()
-	}
-
-	if gbcpu.Regs.getCarry() != 0x0 {
-		*reg ^= 0x80
-	}
-
-	if msBit != 0 {
+	if *reg&0x01 != 0 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
+	}
+
+	*reg = (*reg>>1 | carry<<7)
+
+	if *reg == 0 {
+		gbcpu.Regs.setZero()
+	} else {
+		gbcpu.Regs.clearZero()
 	}
 
 	gbcpu.Regs.clearSubtract()
@@ -152,10 +144,10 @@ func (gbcpu *GBCPU) RRHL() {
 // Least significant bit of reg set to 0
 // Flags: Z00C
 func (gbcpu *GBCPU) SLAr(reg *byte) {
-	lsBit := 0
-
-	if *reg&0x80 == 0x80 {
-		lsBit = 1
+	if *reg&0x80 != 0 {
+		gbcpu.Regs.setCarry()
+	} else {
+		gbcpu.Regs.clearCarry()
 	}
 
 	*reg = *reg << 1
@@ -166,11 +158,8 @@ func (gbcpu *GBCPU) SLAr(reg *byte) {
 		gbcpu.Regs.clearZero()
 	}
 
-	if lsBit != 0 {
-		gbcpu.Regs.setCarry()
-	} else {
-		gbcpu.Regs.clearCarry()
-	}
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
 }
 
 // SLAHL -> e.g. SLA (HL)
@@ -186,7 +175,13 @@ func (gbcpu *GBCPU) SLAHL() {
 // Most significant bit of reg is unaffected
 // Flags: Z000
 func (gbcpu *GBCPU) SRAr(reg *byte) {
-	*reg = (*reg >> 1) | (*reg & 0x80)
+	if *reg&0x01 != 0 {
+		gbcpu.Regs.setCarry()
+	} else {
+		gbcpu.Regs.clearCarry()
+	}
+
+	*reg = (*reg>>1 | *reg&0x80)
 
 	if *reg == 0 {
 		gbcpu.Regs.setZero()
@@ -194,7 +189,8 @@ func (gbcpu *GBCPU) SRAr(reg *byte) {
 		gbcpu.Regs.clearZero()
 	}
 
-	gbcpu.Regs.clearCarry()
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
 }
 
 // SRAHL -> e.g. SRA (HL)
@@ -210,6 +206,16 @@ func (gbcpu *GBCPU) SRAHL() {
 // Flags: Z000
 func (gbcpu *GBCPU) SWAPr(reg *byte) {
 	*reg = (*reg << 4) | (*reg >> 4)
+
+	if *reg == 0 {
+		gbcpu.Regs.setZero()
+	} else {
+		gbcpu.Regs.clearZero()
+	}
+
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
+	gbcpu.Regs.clearCarry()
 }
 
 // SWAPHL -> e.g. SWAP (HL)
@@ -224,10 +230,10 @@ func (gbcpu *GBCPU) SWAPHL() {
 // Most significant bit of reg is set to 0
 // Flags: Z00C
 func (gbcpu *GBCPU) SRLr(reg *byte) {
-	msBit := 0
-
-	if *reg&0x01 == 0x01 {
-		msBit = 1
+	if *reg&0x01 != 0 {
+		gbcpu.Regs.setCarry()
+	} else {
+		gbcpu.Regs.clearCarry()
 	}
 
 	*reg = *reg >> 1
@@ -238,12 +244,8 @@ func (gbcpu *GBCPU) SRLr(reg *byte) {
 		gbcpu.Regs.clearZero()
 	}
 
-	if msBit != 0 {
-		gbcpu.Regs.setCarry()
-	} else {
-		gbcpu.Regs.clearCarry()
-	}
-
+	gbcpu.Regs.clearSubtract()
+	gbcpu.Regs.clearHalfCarry()
 }
 
 // SRLHL -> e.g. SRL (HL)
