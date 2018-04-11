@@ -249,7 +249,7 @@ func (gbcpu *GBCPU) loadInstructions() {
 		// 0xDB: no corresponding instruction
 		0xDC: Instruction{"CALL C,a16", 12, 3, func() int { return gbcpu.CALLCaa() }},
 		// 0xDD: no corresponding instruction
-		0xDE: Instruction{"SBC A,i8", 8, 2, func() int { gbcpu.SBCrn(&gbcpu.Regs.a); return 0 }},
+		0xDE: Instruction{"SBC A,i8", 8, 2, func() int { gbcpu.SBCAn(); return 0 }},
 		0xDF: Instruction{"RST 18H", 16, 1, func() int { gbcpu.RST(0x18); return 0 }},
 		0xE0: Instruction{"LD ($FF00+a8),A", 12, 2, func() int { gbcpu.LDffnr(&gbcpu.Regs.a); return 0 }},
 		0xE1: Instruction{"POP HL", 12, 1, func() int { gbcpu.POPrr(&gbcpu.Regs.h, &gbcpu.Regs.l); return 0 }},
