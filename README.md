@@ -15,7 +15,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
       * 01 - special
       * 02 - interrupts
       * 03 - op sp,hl
-      * 04 - op r,imm
+      * ~04 - op r,imm~
+      
+      ![pass 4](https://my.mixtape.moe/glzofz.png)
       * 05 - op rp
       * ~06 - ld r,r~
       
