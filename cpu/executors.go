@@ -35,11 +35,16 @@ func (gbcpu *GBCPU) LDSPHL() {
 // https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
 func (gbcpu *GBCPU) LDHLSPs() {
 	operand := gbcpu.getOperands(1)[0]
-	operand = (operand ^ 0x80) - 0x80
-	sp := binary.LittleEndian.Uint16(gbcpu.Regs.sp)
-	result := sp + uint16(operand)
+	sp := int(binary.LittleEndian.Uint16(gbcpu.Regs.sp))
+	result := 0
 
-	check := sp ^ result ^ uint16(operand)
+	if operand > 127 {
+		result = sp - (256 - int(operand))
+	} else {
+		result = sp + int(operand)
+	}
+
+	check := sp ^ int(operand) ^ ((sp + int(operand)) & 0xFFFF)
 
 	if (check & 0x100) != 0 {
 		gbcpu.Regs.setCarry()
@@ -53,7 +58,7 @@ func (gbcpu *GBCPU) LDHLSPs() {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(result)
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(uint16(result))
 
 	gbcpu.Regs.clearZero()
 	gbcpu.Regs.clearSubtract()
@@ -538,30 +543,35 @@ func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
 }
 
 // ADDSPs -> e.g. ADD SP,s8
-// Adds 8-bit value to SP
+// Adds signed 8-bit value to SP
 // Sets SP to new value
 // Flags: 00HC
 func (gbcpu *GBCPU) ADDSPs() {
 	operand := gbcpu.getOperands(1)[0]
-	operand = (operand ^ 0x80) - 0x80
-	sp := binary.LittleEndian.Uint16(gbcpu.Regs.sp)
-	result := sp + uint16(operand)
+	sp := int(binary.LittleEndian.Uint16(gbcpu.Regs.sp))
+	result := 0
 
-	check := sp ^ uint16(operand) ^ result
+	if operand > 127 {
+		result = sp - (256 - int(operand))
+	} else {
+		result = sp + int(operand)
+	}
 
-	if (check & 0x100) != 0 {
+	check := sp ^ int(operand) ^ ((sp + int(operand)) & 0xFFFF)
+
+	if (check & 0x100) == 0x100 {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
 	}
 
-	if (check & 0x10) != 0 {
+	if (check & 0x10) == 0x10 {
 		gbcpu.Regs.setHalfCarry()
 	} else {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, result)
+	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, uint16(result))
 
 	gbcpu.Regs.clearZero()
 	gbcpu.Regs.clearSubtract()
@@ -1474,6 +1484,9 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 	*reg1 = b2
 	*reg2 = b1
 
+	// Flags are masked out
+	// https://forums.nesdev.com/viewtopic.php?f=20&t=12815
+	gbcpu.Regs.f &= 0xF0
 }
 
 func (gbcpu *GBCPU) EI() {
