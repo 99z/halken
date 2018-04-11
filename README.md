@@ -20,7 +20,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
       * ~04 - op r,imm~
       
       ![pass 4](https://my.mixtape.moe/glzofz.png)
-      * 05 - op rp
+      * ~05 - op rp~
+      
+      ![pass 5](https://my.mixtape.moe/rulxnw.png)
       * ~06 - ld r,r~
       
       ![pass 6](https://my.mixtape.moe/mfdkmk.png)
