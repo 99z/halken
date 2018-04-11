@@ -514,14 +514,9 @@ func (gbcpu *GBCPU) ADDraa(reg, a1, a2 *byte) {
 // Result is written into HL
 // Flags: -0HC
 func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
-	// hlInt := gbcpu.sliceToInt([]byte{gbcpu.Regs.h, gbcpu.Regs.l})
-	// rrInt := gbcpu.sliceToInt([]byte{*reg1, *reg2})
 	hlInt := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
 	rrInt := gbcpu.Regs.JoinRegs(reg1, reg2)
 	sum := rrInt + hlInt
-	hc := (((rrInt & 0xf) + (hlInt & 0xf)) & 0x10) == 0x10
-
-	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(sum)
 
 	// Check for carry
 	if sum < hlInt {
@@ -531,13 +526,15 @@ func (gbcpu *GBCPU) ADDHLrr(reg1, reg2 *byte) {
 	}
 
 	// Check for half carry
-	if hc {
+	if (sum^rrInt^hlInt)&0x1000 == 0x1000 {
 		// Half-carry occurred
 		gbcpu.Regs.setHalfCarry()
 	} else {
 		// Half-carry did not occur
 		gbcpu.Regs.clearHalfCarry()
 	}
+
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(sum)
 
 	gbcpu.Regs.clearSubtract()
 }
