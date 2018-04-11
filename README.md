@@ -28,7 +28,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
       ![pass 6](https://my.mixtape.moe/mfdkmk.png)
       * 07 - jr,jp,call,ret,rst
       * 08 - misc instrs
-      * 09 - op r,r
+      * ~09 - op r,r~
+      
+      ![pass 9](https://my.mixtape.moe/jkitna.png)
       * ~10 - bit ops~
       
       ![pass 10](https://my.mixtape.moe/ysxqrh.png)
