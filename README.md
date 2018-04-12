@@ -34,7 +34,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
       * ~10 - bit ops~
       
       ![pass 10](https://my.mixtape.moe/ysxqrh.png)
-      * 11 - op a,(hl)
+      * ~11 - op a,(hl)~
+      
+      ![pass 11](https://my.mixtape.moe/jiyqiu.png)
 2. ~Implement memory~
 3. ~Test GB bootstrap ROM~
 4. ~Draw tiles~
