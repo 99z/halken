@@ -1,9 +1,5 @@
 package cpu
 
-import (
-	"encoding/binary"
-)
-
 // Good reference with some info Z80 heaven doesn't contain:
 // http://www.devrs.com/gb/files/GBCPU_Instr.html
 
@@ -36,7 +32,7 @@ func (gbcpu *GBCPU) RLCr(reg *byte) {
 // Rotated bit is copied to carry
 // Flags: Z00C
 func (gbcpu *GBCPU) RLCHL() {
-	gbcpu.RLCr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.RLCr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // RRCr -> e.g. RRC B
@@ -68,7 +64,7 @@ func (gbcpu *GBCPU) RRCr(reg *byte) {
 // Rotated bit is copied to carry
 // Flags: Z00C
 func (gbcpu *GBCPU) RRCHL() {
-	gbcpu.RRCr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.RRCr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // RLr -> e.g. RL B
@@ -103,7 +99,7 @@ func (gbcpu *GBCPU) RLr(reg *byte) {
 // Old carry becomes new 7th bit
 // Flags: Z00C
 func (gbcpu *GBCPU) RLHL() {
-	gbcpu.RLr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.RLr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // RRr -> e.g. RR B
@@ -136,7 +132,7 @@ func (gbcpu *GBCPU) RRr(reg *byte) {
 // Old carry becomes new 7th bit
 // Flags: Z00C
 func (gbcpu *GBCPU) RRHL() {
-	gbcpu.RRr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.RRr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // SLAr -> e.g. SLA B
@@ -167,7 +163,7 @@ func (gbcpu *GBCPU) SLAr(reg *byte) {
 // Least significant bit of reg set to 0
 // Flags: Z00C
 func (gbcpu *GBCPU) SLAHL() {
-	gbcpu.SLAr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.SLAr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // SRAr -> e.g. SRA B
@@ -198,7 +194,7 @@ func (gbcpu *GBCPU) SRAr(reg *byte) {
 // Most significant bit of reg is unaffected
 // Flags: Z000
 func (gbcpu *GBCPU) SRAHL() {
-	gbcpu.SRAr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.SRAr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // SWAPr -> e.g. SWAP B
@@ -222,7 +218,7 @@ func (gbcpu *GBCPU) SWAPr(reg *byte) {
 // Swap nibbles of value at addr (HL)
 // Flags: Z000
 func (gbcpu *GBCPU) SWAPHL() {
-	gbcpu.SWAPr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.SWAPr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // SRLr -> e.g. SRL B
@@ -253,7 +249,7 @@ func (gbcpu *GBCPU) SRLr(reg *byte) {
 // Most significant bit of reg is set to 0
 // Flags: Z00C
 func (gbcpu *GBCPU) SRLHL() {
-	gbcpu.SRLr(&GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.SRLr(&GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // BITnr -> e.g. BIT 0,B
@@ -276,7 +272,7 @@ func (gbcpu *GBCPU) BITnr(pos uint8, reg *byte) {
 // Test bit at position in value at addr (HL)
 // Flags: Z01-
 func (gbcpu *GBCPU) BITHL(pos uint8) {
-	gbcpu.BITnr(pos, &GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.BITnr(pos, &GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // RESnr -> e.g. RES 0,B
@@ -290,7 +286,7 @@ func (gbcpu *GBCPU) RESnr(pos uint8, reg *byte) {
 // Reset bit in value at addr (HL)
 // Flags: ----
 func (gbcpu *GBCPU) RESHL(pos uint8) {
-	gbcpu.RESnr(pos, &GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.RESnr(pos, &GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }
 
 // SETnr -> e.g. SET 0,B
@@ -304,5 +300,5 @@ func (gbcpu *GBCPU) SETnr(pos uint8, reg *byte) {
 // Set bit in value at addr (HL)
 // Flags: ----
 func (gbcpu *GBCPU) SETHL(pos uint8) {
-	gbcpu.SETnr(pos, &GbMMU.Memory[binary.LittleEndian.Uint16([]byte{gbcpu.Regs.h, gbcpu.Regs.l})])
+	gbcpu.SETnr(pos, &GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }

@@ -133,6 +133,14 @@ func (regs *Registers) clearSubtract() {
 	regs.f &= byte(mask)
 }
 
+func (regs *Registers) getSubtract() byte {
+	if regs.f&(1<<6) != 0 {
+		return 1
+	}
+
+	return 0
+}
+
 func (regs *Registers) setHalfCarry() {
 	regs.f |= (1 << 5)
 }
@@ -140,6 +148,14 @@ func (regs *Registers) setHalfCarry() {
 func (regs *Registers) clearHalfCarry() {
 	mask := ^(1 << 5)
 	regs.f &= byte(mask)
+}
+
+func (regs *Registers) getHalfCarry() byte {
+	if regs.f&(1<<5) != 0 {
+		return 1
+	}
+
+	return 0
 }
 
 func (regs *Registers) setCarry() {
