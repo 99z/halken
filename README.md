@@ -12,7 +12,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
     * ~Non-CB opcodes implemented~
      * ~Write dispatch loop~
      * Use blargg's test output to fix instructions
-      * 01 - special
+      * ~01 - special~
+      
+      ![pass 1](https://my.mixtape.moe/rtjfln.png)
       * 02 - interrupts
       * ~03 - op sp,hl~
       
@@ -27,14 +29,18 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
       
       ![pass 6](https://my.mixtape.moe/mfdkmk.png)
       * 07 - jr,jp,call,ret,rst
-      * 08 - misc instrs
+      * ~08 - misc instrs~
+      
+      ![pass 8](https://my.mixtape.moe/ffzyco.png)
       * ~09 - op r,r~
       
       ![pass 9](https://my.mixtape.moe/jkitna.png)
       * ~10 - bit ops~
       
       ![pass 10](https://my.mixtape.moe/ysxqrh.png)
-      * 11 - op a,(hl)
+      * ~11 - op a,(hl)~
+      
+      ![pass 11](https://my.mixtape.moe/jiyqiu.png)
 2. ~Implement memory~
 3. ~Test GB bootstrap ROM~
 4. ~Draw tiles~
