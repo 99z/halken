@@ -12,7 +12,9 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
     * ~Non-CB opcodes implemented~
      * ~Write dispatch loop~
      * Use blargg's test output to fix instructions
-      * 01 - special
+      * ~01 - special~
+      
+      ![pass 1](https://my.mixtape.moe/rtjfln.png)
       * 02 - interrupts
       * ~03 - op sp,hl~
       
