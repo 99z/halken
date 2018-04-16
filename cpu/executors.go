@@ -322,8 +322,11 @@ func (gbcpu *GBCPU) LDaaSP() {
 
 func (gbcpu *GBCPU) LDSPnn() {
 	operands := gbcpu.getOperands(2)
+	// newSP := make([]byte, 2)
+	// newSP[1] = operands[1]
+	// newSP[0] = operands[0]
 	gbcpu.Regs.sp = operands
-
+	// gbcpu.Regs.Dump()
 }
 
 // ADDrr -> e.g. ADD A,B
@@ -1118,6 +1121,22 @@ func (gbcpu *GBCPU) CPaa(a1, a2 *byte) {
 func (gbcpu *GBCPU) PUSHrr(reg1, reg2 *byte) {
 	gbcpu.pushByteToStack(*reg1)
 	gbcpu.pushByteToStack(*reg2)
+	// gbcpu.Regs.f &= 0xF0
+	// gbcpu.Regs.Dump()
+}
+
+// POPrr copies 2 bytes at addr (SP) into the operand
+// Flags: ZNHC
+func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
+	b1 := gbcpu.popByteFromStack()
+	b2 := gbcpu.popByteFromStack()
+	*reg1 = b2
+	*reg2 = b1
+
+	// Flags are masked out
+	// https://forums.nesdev.com/viewtopic.php?f=20&t=12815
+	gbcpu.Regs.f &= 0xF0
+
 	// gbcpu.Regs.Dump()
 }
 
@@ -1261,16 +1280,16 @@ func (gbcpu *GBCPU) JPNCaa() int {
 // Pushes the addr at PC+3 to the stack
 // Jumps to the address specified by next 2 bytes
 func (gbcpu *GBCPU) CALLaa() {
-
+	operands := gbcpu.getOperands(2)
 	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 3
 	nextInstrBytes := make([]byte, 2)
 	binary.LittleEndian.PutUint16(nextInstrBytes, nextInstr)
 	gbcpu.pushByteToStack(nextInstrBytes[1])
 	gbcpu.pushByteToStack(nextInstrBytes[0])
-	gbcpu.Regs.PC = gbcpu.getOperands(2)
-	// binary.LittleEndian.PutUint16(gbcpu.Regs.sp, gbcpu.sliceToInt(gbcpu.Regs.PC)+1)
+	gbcpu.Regs.PC = operands
 
 	gbcpu.Jumped = true
+	// gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) CALLZaa() int {
@@ -1541,21 +1560,6 @@ func (gbcpu *GBCPU) RETNZ() int {
 	return 0
 }
 
-// POPrr copies 2 bytes at addr (SP) into the operand
-// Flags: ZNHC
-func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
-	b1 := gbcpu.popByteFromStack()
-	b2 := gbcpu.popByteFromStack()
-	*reg1 = b2
-	*reg2 = b1
-
-	// Flags are masked out
-	// https://forums.nesdev.com/viewtopic.php?f=20&t=12815
-	gbcpu.Regs.f &= 0xF0
-
-	// gbcpu.Regs.Dump()
-}
-
 func (gbcpu *GBCPU) EI() {
 	// TODO
 	// Enables interrupts
@@ -1581,8 +1585,11 @@ func (gbcpu *GBCPU) getOperands(number uint16) []byte {
 	begin := gbcpu.sliceToInt(gbcpu.Regs.PC) + 1
 	end := gbcpu.sliceToInt(gbcpu.Regs.PC) + (1 + number)
 
-	return GbMMU.Memory[begin:end]
-	// return []byte{args[1], args[0]}
+	operands := make([]byte, 2)
+	copy(operands, GbMMU.Memory[begin:end])
+
+	// return GbMMU.Memory[begin:end]
+	return operands
 }
 
 func (gbcpu *GBCPU) getValCartAddr(a1, a2 *byte, number uint16) []byte {

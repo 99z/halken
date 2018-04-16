@@ -108,7 +108,7 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 		operation := GbMMU.Memory[opcodeInt]
 
 		// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-		// fmt.Printf("C67A: %02X\n", GbMMU.Memory[0xC67A])
+		// fmt.Printf("C67C: %02X\n", GbMMU.Memory[0xC67D:0xC67F])
 		delay := GbCPU.Instrs[operation].Executor()
 
 		// if opcode[0] == 68 && opcode[1] == 203 {

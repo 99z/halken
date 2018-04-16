@@ -94,15 +94,15 @@ func (regs *Registers) JoinRegs(reg1, reg2 *byte) uint16 {
 
 // incrementSP converts current SP to an integer,
 // increments it by 1, then stores it back as 2 bytes
-func (regs *Registers) incrementSP(amt uint16) {
+func (regs *Registers) incrementSP(amt byte) {
 	spInt := binary.LittleEndian.Uint16(regs.sp)
-	spInt += amt
+	spInt += uint16(amt)
 	binary.LittleEndian.PutUint16(regs.sp, spInt)
 }
 
-func (regs *Registers) decrementSP(amt uint16) {
+func (regs *Registers) decrementSP(amt byte) {
 	spInt := binary.LittleEndian.Uint16(regs.sp)
-	spInt -= amt
+	spInt -= uint16(amt)
 	binary.LittleEndian.PutUint16(regs.sp, spInt)
 }
 
