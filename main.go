@@ -30,5 +30,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	ebiten.Run(GbLCD.Run, 160, 144, 2, "Halken")
+	ebiten.Run(GbLCD.Run, 160, 144, 4, "Halken")
 }

@@ -29,6 +29,12 @@ type Pixel struct {
 	Color color.RGBA
 }
 
+type Sprite struct {
+	Y    int
+	X    int
+	Tile []*Pixel
+}
+
 const (
 	LCDC = 0xFF40
 	STAT = 0xFF41
@@ -63,22 +69,8 @@ var (
 func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	// Logical update
 	gblcd.Update(screen)
-	// tiles := loadTilesDebug(0x8000, 0x9000)
-	// ebitenTiles, _ := ebiten.NewImageFromImage(tiles, ebiten.FilterDefault)
-	// opts := &ebiten.DrawImageOptions{}
-	// opts.GeoM.Translate(160, 0)
-	// screen.DrawImage(ebitenTiles, opts)
 
-	// testTile := renderTile(0x8390)
-	// ebiTest, _ := ebiten.NewImageFromImage(testTile, ebiten.FilterDefault)
-	// testOpts := &ebiten.DrawImageOptions{}
-	// screen.DrawImage(ebiTest, testOpts)
-
-	// scy := int(GbMMU.Memory[SCY])
-	// scx := int(GbMMU.Memory[SCX])
-	// gblcd.renderBackground(GbMMU.Memory[0x9800:0x9C00])
-
-	gblcd.renderWindow(GbMMU.Memory[0x9800:0x9C00])
+	gblcd.renderWindow()
 
 	ebitenBG, _ := ebiten.NewImageFromImage(gblcd.window, ebiten.FilterDefault)
 	opts := &ebiten.DrawImageOptions{}
@@ -145,6 +137,143 @@ func lcdEnabled() byte {
 	return GbMMU.Memory[STAT] & (1 << 7)
 }
 
+func (gblcd *GBLCD) renderWindow() {
+	bgmap := GbMMU.Memory[0x9800:0x9C00]
+
+	// ((y tile offset * num pixels per row) + (x tile offset * 8)) / 8
+	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
+	var tiles [][]*Pixel
+
+	var yVal byte = GbMMU.Memory[SCY]
+	var xVal byte = GbMMU.Memory[SCX]
+	var initialX byte = GbMMU.Memory[SCX]
+	yOff := int(yVal) * 256
+	xOff := int(xVal) * 8
+	offset := (yOff + xOff) / 64
+
+	// Get tiles on background map
+	for height := 0; height < 18; height++ {
+		for width := 0; width < 20; width++ {
+			// Pass tile ID to renderTile
+			tile := renderTile(int(bgmap[offset]))
+			tiles = append(tiles, tile)
+
+			// Move to the next tile
+			xVal += 8
+			xOff = int(xVal) * 8
+
+			offset = (yOff + xOff) / 64
+		}
+
+		yVal += 8
+		yOff = int(yVal) * 256
+		xVal = initialX
+		xOff = int(xVal) * 8
+		offset = (yOff + xOff) / 64
+	}
+
+	// sprites := gblcd.renderSprites()
+
+	for i, tile := range tiles {
+		for _, px := range tile {
+			tileX := ((i % 20) * 8)
+			tileY := ((i / 20) * 8)
+			window.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
+		}
+	}
+
+	// for _, sprite := range sprites {
+	// 	for _, px := range sprite.Tile {
+	// 		window.Set(px.Point.X+sprite.X, px.Point.Y+sprite.Y, px.Color)
+	// 	}
+	// }
+
+	gblcd.window = window
+}
+
+func (gblcd *GBLCD) renderSprites() []*Sprite {
+	var sprites []*Sprite
+	oam := GbMMU.Memory[0xFE00:0xFEA0]
+
+	for i := 0; i < len(oam); i += 4 {
+		// Get next sprite data
+		spriteData := GbMMU.Memory[0xFE00+i : 0xFE00+i+4]
+
+		yLoc := spriteData[0] - 16
+		xLoc := spriteData[1] - 8
+		tile := renderTile(int(spriteData[2]))
+
+		s := &Sprite{
+			Y:    int(yLoc),
+			X:    int(xLoc),
+			Tile: tile,
+		}
+
+		sprites = append(sprites, s)
+	}
+
+	return sprites
+}
+
+func renderTile(tileID int) []*Pixel {
+	pixels := []*Pixel{}
+
+	// Color map is conflicting on http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html
+	// 00 is light gray, not white
+	palette := [4]color.RGBA{
+		color.RGBA{120, 170, 120, 255},
+		color.RGBA{205, 255, 205, 255},
+		color.RGBA{35, 85, 35, 255},
+		color.RGBA{0, 0, 0, 255},
+	}
+
+	loTiles := GbMMU.Memory[LCDC]&(1<<4) == 1
+
+	if loTiles {
+		tileID = 0x8000 + (tileID * 16)
+	} else {
+		if tileID > 127 {
+			tileID = tileID - 128
+			tileID = 0x8800 + (tileID * 16)
+		} else {
+			tileID = 0x8800 + ((tileID + 128) * 16)
+		}
+	}
+
+	tileVals := GbMMU.Memory[tileID : tileID+16]
+
+	// Iterate over lines of tiles, represented by 2 bytes
+	for line := 0; line < 8; line++ {
+		hi := tileVals[line*2]
+		lo := tileVals[line*2+1]
+
+		// Iterate over individual pixels of tile lines
+		for pix := 0; pix < 8; pix++ {
+			// TODO Maybe make color lookup more like hardware
+			// http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html
+			hiBit := (lo >> (7 - uint8(pix))) & 1
+			loBit := (hi >> (7 - uint8(pix))) & 1
+
+			colorIndex := loBit + hiBit*2
+			color := palette[colorIndex]
+			pixX := pix
+			pixY := line
+
+			p := &Pixel{
+				Point: image.Point{pixX, pixY},
+				Color: color,
+			}
+
+			pixels = append(pixels, p)
+
+			// tile.Set(pixX, pixY, color)
+		}
+	}
+
+	// return tile
+	return pixels
+}
+
 func loadTilesDebug(beg, end int) *image.RGBA {
 	bg := image.NewRGBA(image.Rect(0, 0, 128, 128))
 	// Tile set #1: 0x8000 - 0x87FF
@@ -188,115 +317,28 @@ func loadTilesDebug(beg, end int) *image.RGBA {
 	return bg
 }
 
-func (gblcd *GBLCD) renderWindow(bgmap []byte) {
-	// ((y tile offset * num pixels per row) + (x tile offset * 8)) / 8
-	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
-	var tiles [][]*Pixel
-
-	var yVal byte = GbMMU.Memory[SCY]
-	var xVal byte = GbMMU.Memory[SCX]
-	var initialX byte = GbMMU.Memory[SCX]
-	yOff := int(yVal) * 256
-	xOff := int(xVal) * 8
-	offset := (yOff + xOff) / 64
-
-	for height := 0; height < 18; height++ {
-		for width := 0; width < 20; width++ {
-			tile := renderTile(int(bgmap[offset]) * 16)
-			tiles = append(tiles, tile)
-
-			// Move to the next tile
-			xVal += 8
-			xOff = int(xVal) * 8
-
-			offset = (yOff + xOff) / 64
-		}
-
-		yVal += 8
-		yOff = int(yVal) * 256
-		xVal = initialX
-		xOff = int(xVal) * 8
-		offset = (yOff + xOff) / 64
-	}
-
-	for i, tile := range tiles {
-		for _, px := range tile {
-			tileX := ((i % 20) * 8)
-			tileY := ((i / 20) * 8)
-			window.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
-		}
-	}
-
-	gblcd.window = window
-}
-
 // BG map is 32*32 bytes, each references a tile
-func (gblcd *GBLCD) renderBackground(bgmap []byte) {
-	bg := image.NewRGBA(image.Rect(0, 0, 256, 256))
-	var tiles [][]*Pixel
+// func (gblcd *GBLCD) renderBackgroundDebug(bgmap []byte) {
+// 	bg := image.NewRGBA(image.Rect(0, 0, 256, 256))
+// 	var tiles [][]*Pixel
 
-	// Iterate over 1024 tile IDs
-	for _, tileID := range bgmap {
-		// Render tile referenced by value in bgmap
-		tile := renderTile(int(tileID) * 16)
-		tiles = append(tiles, tile)
-	}
+// 	// Iterate over 1024 tile IDs
+// 	for _, tileID := range bgmap {
+// 		// Render tile referenced by value in bgmap
+// 		tile := renderTile(int(tileID) * 16)
+// 		tiles = append(tiles, tile)
+// 	}
 
-	for i, tile := range tiles {
-		for _, px := range tile {
-			tileX := ((i % 32) * 8)
-			tileY := ((i / 32) * 8)
-			bg.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
-		}
-	}
+// 	for i, tile := range tiles {
+// 		for _, px := range tile {
+// 			tileX := ((i % 32) * 8)
+// 			tileY := ((i / 32) * 8)
+// 			bg.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
+// 		}
+// 	}
 
-	gblcd.currentBG = bg
-}
-
-func renderTile(tileAddr int) []*Pixel {
-	// tile := image.NewRGBA(image.Rect(0, 0, 8, 8))
-	pixels := []*Pixel{}
-
-	palette := [4]color.RGBA{
-		color.RGBA{255, 255, 255, 255},
-		color.RGBA{170, 170, 170, 255},
-		color.RGBA{85, 85, 85, 255},
-		color.RGBA{0, 0, 0, 255},
-	}
-
-	tileAddr = tileAddr + 0x8000
-	tileVals := GbMMU.Memory[tileAddr : tileAddr+16]
-	// fmt.Printf("%04X\n", tileAddr)
-
-	// Iterate over lines of tiles, represented by 2 bytes
-	for line := 0; line < 8; line++ {
-		hi := tileVals[line*2]
-		lo := tileVals[line*2+1]
-
-		// Iterate over individual pixels of tile lines
-		for pix := 0; pix < 8; pix++ {
-			hiBit := (hi >> (7 - uint8(pix))) & 1
-			loBit := (lo >> (7 - uint8(pix))) & 1
-
-			colorIndex := loBit + hiBit*2
-			color := palette[colorIndex]
-			pixX := pix
-			pixY := line
-
-			p := &Pixel{
-				Point: image.Point{pixX, pixY},
-				Color: color,
-			}
-
-			pixels = append(pixels, p)
-
-			// tile.Set(pixX, pixY, color)
-		}
-	}
-
-	// return tile
-	return pixels
-}
+// 	gblcd.currentBG = bg
+// }
 
 func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	switch gblcd.mode {
@@ -323,9 +365,6 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 
 			if gblcd.currentLine == 143 {
 				gblcd.mode = 1
-				// TODO draw image to screen
-				// gblcd.drawDebugTiles(screen)
-				// screen.Fill(color.RGBA{255, 255, 255, 255})
 			} else {
 				gblcd.mode = 2
 			}
@@ -341,7 +380,6 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 				gblcd.mode = 2
 				gblcd.currentLine = 0
 				GbMMU.Memory[LY] = 0
-				// screen.Fill(color.RGBA{0, 0, 0, 255})
 			}
 		}
 	}
