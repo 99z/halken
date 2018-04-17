@@ -305,10 +305,15 @@ func (gbcpu *GBCPU) RRA() {
 // RST pushes current PC + 3 onto stack
 // MSB of PC is set to 0x00, LSB is set to argument
 func (gbcpu *GBCPU) RST(imm byte) {
-	val := gbcpu.sliceToInt(gbcpu.Regs.PC)
-	val += 3
-	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, val)
+	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 1
+	nextInstrBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(nextInstrBytes, nextInstr)
+	gbcpu.pushByteToStack(nextInstrBytes[1])
+	gbcpu.pushByteToStack(nextInstrBytes[0])
+
 	gbcpu.Regs.PC = []byte{imm, 0x00}
+	gbcpu.Jumped = true
+	// gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) LDaaSP() {

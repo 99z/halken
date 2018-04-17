@@ -69,11 +69,14 @@ func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
 	// 	fmt.Printf("Wrote to %04X\n", addrInt)
 	// }
 	gbmmu.Memory[addrInt] = data
-	// memLoc := addrInt & 0x0FFF
 }
 
 func (gbmmu *GBMMU) ReadByte(addr []byte) byte {
 	memLoc := binary.LittleEndian.Uint16(addr)
+	if memLoc >= 65535 {
+		memLoc--
+	}
+
 	return gbmmu.Memory[memLoc]
 }
 
@@ -94,8 +97,8 @@ func (gbmmu *GBMMU) LoadCart(path string) error {
 	gbmmu.Memory[0x0147] = cartData[0x0147]
 	gbmmu.Memory[0x0148] = cartData[0x0148]
 	gbmmu.Memory[0x0149] = cartData[0x0149]
-	for i, v := range cartData[0x0100:] {
-		gbmmu.Memory[0x0100+i] = v
+	for i, v := range cartData[0x0000:] {
+		gbmmu.Memory[0x0000+i] = v
 	}
 	return nil
 }
