@@ -11,7 +11,6 @@ import (
 	"../io"
 	"../mmu"
 	"github.com/hajimehoshi/ebiten"
-	"github.com/hajimehoshi/ebiten/ebitenutil"
 )
 
 type GBLCD struct {
@@ -102,21 +101,21 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 
 		operation := GbMMU.Memory[opcodeInt]
 
-		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-		fmt.Printf("FF00: %v\n", GbMMU.Memory[0xFF00])
+		// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
+		// fmt.Printf("FF00: %v\n", GbMMU.Memory[0xFF00])
 
 		// if GbMMU.Memory[0xFF40] == 0xD3 {
 		// 	fmt.Printf("LCDC: %v\n", GbMMU.Memory[0xFF40])
 		// }
 
 		delay := GbCPU.Instrs[operation].Executor()
-		GbCPU.Regs.Dump()
+		// GbCPU.Regs.Dump()
 
 		// if opcode[0] == 68 && opcode[1] == 203 {
 		// 	os.Exit(0)
 		// }
 
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("%02X:%02X", opcode[1], opcode[0]))
+		// ebitenutil.DebugPrint(screen, fmt.Sprintf("%02X:%02X", opcode[1], opcode[0]))
 
 		// Update cycles
 		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay

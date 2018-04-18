@@ -59,16 +59,12 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.Memory[0xFF49] = 0xFF
 }
 
-func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
-	addrInt := binary.LittleEndian.Uint16(addr)
-	if addrInt >= 65535 {
-		addrInt--
+func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
+	if addr >= 65535 {
+		addr--
 	}
 
-	// if addrInt >= 0x8000 && addrInt <= 0x97FF {
-	// 	fmt.Printf("Wrote to %04X\n", addrInt)
-	// }
-	gbmmu.Memory[addrInt] = data
+	gbmmu.Memory[addr] = data
 }
 
 func (gbmmu *GBMMU) ReadByte(addr []byte) byte {
