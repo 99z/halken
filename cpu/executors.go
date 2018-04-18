@@ -1146,7 +1146,7 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 // a1, s2 are 8-bit components of a 16-bit address
 // Loads value at location a1a2 into reg
 func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
-	*reg = GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
 }
 
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
@@ -1162,7 +1162,7 @@ func (gbcpu *GBCPU) LDnnr(reg *byte) {
 func (gbcpu *GBCPU) LDrnn(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	addr := gbcpu.sliceToInt(operands)
-	*reg = GbMMU.Memory[addr]
+	*reg = GbMMU.ReadByte(addr)
 
 }
 
@@ -1172,7 +1172,7 @@ func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
 }
 
 func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
-	*reg1 = GbMMU.Memory[0xFF00+uint16(*reg2)]
+	*reg1 = GbMMU.ReadByte(0xFF00 + uint16(*reg2))
 }
 
 func (gbcpu *GBCPU) LDffnr(reg *byte) {
@@ -1181,10 +1181,8 @@ func (gbcpu *GBCPU) LDffnr(reg *byte) {
 }
 
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
-	operand := gbcpu.getOperands(1)
-	addr := make([]byte, 2)
-	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0]))
-	*reg = GbMMU.ReadByte(addr)
+	operand := gbcpu.getOperands(1)[0]
+	*reg = GbMMU.ReadByte(0xFF00 + uint16(operand))
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
@@ -1220,7 +1218,7 @@ func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
 // Set value in reg to value at address a1a2
 // Increment HL
 func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
-	*reg = GbMMU.ReadByte([]byte{*a2, *a1})
+	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
 	gbcpu.Regs.incrementHL(1)
 }
 
@@ -1561,15 +1559,14 @@ func (gbcpu *GBCPU) RETNZ() int {
 	return 0
 }
 
+// EI sets IME to FF
 func (gbcpu *GBCPU) EI() {
-	// TODO
-	// Enables interrupts
+	GbMMU.WriteByte(0xFFFF, 0xFF)
 }
 
+// DI sets IME to 0
 func (gbcpu *GBCPU) DI() {
-
-	// TODO
-	// Disables interrupts
+	GbMMU.WriteByte(0xFFFF, 0x00)
 }
 
 func (gbcpu *GBCPU) CB() int {

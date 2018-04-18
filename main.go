@@ -22,8 +22,9 @@ func main() {
 
 	cpu.GbMMU = GbMMU
 	lcd.GbMMU = GbMMU
+	mmu.GbIO = GbIO
+	lcd.GbIO = GbIO
 	lcd.GbCPU = GbCPU
-	io.GbMMU = GbMMU
 	GbMMU.InitMMU()
 	GbCPU.InitCPU()
 	GbIO.InitIO()

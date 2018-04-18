@@ -45,7 +45,7 @@ func (gbcpu *GBCPU) pushByteToStack(data byte) {
 }
 
 func (gbcpu *GBCPU) popByteFromStack() byte {
-	result := GbMMU.ReadByte(gbcpu.Regs.sp)
+	result := GbMMU.ReadByte(gbcpu.sliceToInt(gbcpu.Regs.sp))
 	gbcpu.Regs.incrementSP(1)
 	return result
 }

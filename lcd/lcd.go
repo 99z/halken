@@ -2,7 +2,6 @@ package lcd
 
 import (
 	"encoding/binary"
-	"fmt"
 	"image"
 	"image/color"
 	"time"
@@ -236,13 +235,9 @@ func renderTile(tileID int) []*Pixel {
 		color.RGBA{0, 0, 0, 255},
 	}
 
-	loTiles := GbMMU.Memory[LCDC]&(1<<4) == 1
-	if GbMMU.Memory[LCDC] == 0xD3 {
-		fmt.Println(GbMMU.Memory[LCDC])
-	}
+	loTiles := GbMMU.Memory[LCDC]&(1<<4) != 0
 
-	// Temporarily flipped for testing
-	if !loTiles {
+	if loTiles {
 		tileID = 0x8000 + (tileID * 16)
 	} else {
 		// If we're in hi tiles set, tile locations are signed

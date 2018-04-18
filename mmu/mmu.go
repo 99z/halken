@@ -1,9 +1,10 @@
 package mmu
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
+
+	"../io"
 )
 
 // Reference http://gameboy.mongenel.com/dmg/asmmemmap.html
@@ -12,6 +13,8 @@ type GBMMU struct {
 	Memory [0xFFFF]byte
 	areas  map[string][]uint16
 }
+
+var GbIO *io.GBIO
 
 // Initial register values
 // Reference: http://bgb.bircd.org/pandocs.htm#powerupsequence
@@ -60,20 +63,24 @@ func (gbmmu *GBMMU) InitMMU() {
 }
 
 func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
-	if addr >= 65535 {
-		addr--
+	if addr == 0xFFFF {
+		// Enable interrupts
+		gbmmu.Memory[0xFFFE] = data
+	} else if addr == 0xFF00 {
+		GbIO.SetCol(data)
+	} else {
+		gbmmu.Memory[addr] = data
 	}
-
-	gbmmu.Memory[addr] = data
 }
 
-func (gbmmu *GBMMU) ReadByte(addr []byte) byte {
-	memLoc := binary.LittleEndian.Uint16(addr)
-	if memLoc >= 65535 {
-		memLoc--
+func (gbmmu *GBMMU) ReadByte(addr uint16) byte {
+	if addr == 0xFFFF {
+		return gbmmu.Memory[0xFFFE]
+	} else if addr == 0xFF00 {
+		return GbIO.GetInput()
+	} else {
+		return gbmmu.Memory[addr]
 	}
-
-	return gbmmu.Memory[memLoc]
 }
 
 // Reads cartridge ROM into Memory
