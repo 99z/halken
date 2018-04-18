@@ -1376,6 +1376,7 @@ func (gbcpu *GBCPU) JRZn() int {
 
 // Jumps if zero flag = 0
 func (gbcpu *GBCPU) JRNZn() int {
+	gbcpu.Regs.Dump()
 	operand := gbcpu.getOperands(1)[0]
 
 	if gbcpu.Regs.getZero() == 0 {

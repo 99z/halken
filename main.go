@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"./cpu"
+	"./io"
 	"./lcd"
 	"./mmu"
 	"github.com/hajimehoshi/ebiten"
@@ -14,6 +15,7 @@ import (
 var GbCPU = new(cpu.GBCPU)
 var GbMMU = new(mmu.GBMMU)
 var GbLCD = new(lcd.GBLCD)
+var GbIO = new(io.GBIO)
 
 func main() {
 	cartPath := os.Args[1]
@@ -21,8 +23,10 @@ func main() {
 	cpu.GbMMU = GbMMU
 	lcd.GbMMU = GbMMU
 	lcd.GbCPU = GbCPU
+	io.GbMMU = GbMMU
 	GbMMU.InitMMU()
 	GbCPU.InitCPU()
+	GbIO.InitIO()
 
 	err := GbMMU.LoadCart(cartPath)
 	if err != nil {

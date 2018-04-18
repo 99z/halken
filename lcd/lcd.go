@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"../cpu"
+	"../io"
 	"../mmu"
 	"github.com/hajimehoshi/ebiten"
 	"github.com/hajimehoshi/ebiten/ebitenutil"
@@ -58,6 +59,7 @@ const tileBytes = 16
 var (
 	GbMMU *mmu.GBMMU
 	GbCPU *cpu.GBCPU
+	GbIO  *io.GBIO
 
 	frames = 0
 	second = time.Tick(time.Second)
@@ -68,6 +70,7 @@ var (
 // ((y offset * num pixels per row) + (x offset * 8)) / 8
 func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
 	// Logical update
+	GbIO.ReadInput()
 	gblcd.Update(screen)
 
 	gblcd.renderWindow()
@@ -99,9 +102,15 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 
 		operation := GbMMU.Memory[opcodeInt]
 
-		// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-		// fmt.Printf("C67C: %02X\n", GbMMU.Memory[0xC67D:0xC67F])
+		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
+		fmt.Printf("FF00: %v\n", GbMMU.Memory[0xFF00])
+
+		// if GbMMU.Memory[0xFF40] == 0xD3 {
+		// 	fmt.Printf("LCDC: %v\n", GbMMU.Memory[0xFF40])
+		// }
+
 		delay := GbCPU.Instrs[operation].Executor()
+		GbCPU.Regs.Dump()
 
 		// if opcode[0] == 68 && opcode[1] == 203 {
 		// 	os.Exit(0)
@@ -172,7 +181,7 @@ func (gblcd *GBLCD) renderWindow() {
 		offset = (yOff + xOff) / 64
 	}
 
-	// sprites := gblcd.renderSprites()
+	sprites := gblcd.renderSprites()
 
 	for i, tile := range tiles {
 		for _, px := range tile {
@@ -182,11 +191,12 @@ func (gblcd *GBLCD) renderWindow() {
 		}
 	}
 
-	// for _, sprite := range sprites {
-	// 	for _, px := range sprite.Tile {
-	// 		window.Set(px.Point.X+sprite.X, px.Point.Y+sprite.Y, px.Color)
-	// 	}
-	// }
+	// fmt.Println(sprites[6].Y)
+	for _, sprite := range sprites {
+		for _, px := range sprite.Tile {
+			window.Set(px.Point.X+sprite.X, px.Point.Y+sprite.Y, px.Color)
+		}
+	}
 
 	gblcd.window = window
 }
@@ -228,10 +238,15 @@ func renderTile(tileID int) []*Pixel {
 	}
 
 	loTiles := GbMMU.Memory[LCDC]&(1<<4) == 1
+	if GbMMU.Memory[LCDC] == 0xD3 {
+		fmt.Println(GbMMU.Memory[LCDC])
+	}
 
-	if loTiles {
+	// Temporarily flipped for testing
+	if !loTiles {
 		tileID = 0x8000 + (tileID * 16)
 	} else {
+		// If we're in hi tiles set, tile locations are signed
 		if tileID > 127 {
 			tileID = tileID - 128
 			tileID = 0x8800 + (tileID * 16)
