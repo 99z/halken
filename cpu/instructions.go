@@ -143,7 +143,7 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0x73: Instruction{"LD (HL),E", 8, 1, func() int { gbcpu.LDaar(&gbcpu.Regs.h, &gbcpu.Regs.l, &gbcpu.Regs.e); return 0 }},
 		0x74: Instruction{"LD (HL),H", 8, 1, func() int { gbcpu.LDaar(&gbcpu.Regs.h, &gbcpu.Regs.l, &gbcpu.Regs.h); return 0 }},
 		0x75: Instruction{"LD (HL),L", 8, 1, func() int { gbcpu.LDaar(&gbcpu.Regs.h, &gbcpu.Regs.l, &gbcpu.Regs.l); return 0 }},
-		0x76: Instruction{"HALT", 4, 1, func() int { return 0 }},
+		0x76: Instruction{"HALT", 4, 1, func() int { gbcpu.HALT(); return 0 }},
 		0x77: Instruction{"LD (HL),A", 8, 1, func() int { gbcpu.LDaar(&gbcpu.Regs.h, &gbcpu.Regs.l, &gbcpu.Regs.a); return 0 }},
 		0x78: Instruction{"LD A,B", 4, 1, func() int { gbcpu.LDrr(&gbcpu.Regs.a, &gbcpu.Regs.b); return 0 }},
 		0x79: Instruction{"LD A,C", 4, 1, func() int { gbcpu.LDrr(&gbcpu.Regs.a, &gbcpu.Regs.c); return 0 }},

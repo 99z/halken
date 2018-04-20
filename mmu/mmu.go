@@ -1,9 +1,10 @@
 package mmu
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
+
+	"../io"
 )
 
 // Reference http://gameboy.mongenel.com/dmg/asmmemmap.html
@@ -12,6 +13,8 @@ type GBMMU struct {
 	Memory [0xFFFF]byte
 	areas  map[string][]uint16
 }
+
+var GbIO *io.GBIO
 
 // Initial register values
 // Reference: http://bgb.bircd.org/pandocs.htm#powerupsequence
@@ -36,6 +39,7 @@ func (gbmmu *GBMMU) InitMMU() {
 	// I/O register initial values after boot ROM
 	// TODO Might want to just execute boot ROM instead, since
 	// documentation online is sketchy about these
+	gbmmu.Memory[0xFF0F] = 0xE1
 	gbmmu.Memory[0xFF10] = 0x80
 	gbmmu.Memory[0xFF11] = 0xBF
 	gbmmu.Memory[0xFF12] = 0xF3
@@ -59,25 +63,34 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.Memory[0xFF49] = 0xFF
 }
 
-func (gbmmu *GBMMU) WriteByte(addr []byte, data byte) {
-	addrInt := binary.LittleEndian.Uint16(addr)
-	if addrInt >= 65535 {
-		addrInt--
+func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
+	if addr == 0xFFFF {
+		// Enable interrupts
+		gbmmu.Memory[0xFFFE] = data
+	} else if addr == 0xFF00 {
+		GbIO.SetCol(data)
+	} else if addr == 0xFF0F {
+		// gbmmu.Memory[0xFF0F] ^= 1
+	} else if addr == 0xFF41 {
+		return
+	} else if addr == 0xFF46 {
+		spriteAddr := int(data) * 256
+		for i := range gbmmu.Memory[0xFE00:0xFEA0] {
+			gbmmu.Memory[0xFE00+i] = gbmmu.Memory[spriteAddr+i]
+		}
+	} else {
+		gbmmu.Memory[addr] = data
 	}
-
-	// if addrInt >= 0x8000 && addrInt <= 0x97FF {
-	// 	fmt.Printf("Wrote to %04X\n", addrInt)
-	// }
-	gbmmu.Memory[addrInt] = data
 }
 
-func (gbmmu *GBMMU) ReadByte(addr []byte) byte {
-	memLoc := binary.LittleEndian.Uint16(addr)
-	if memLoc >= 65535 {
-		memLoc--
+func (gbmmu *GBMMU) ReadByte(addr uint16) byte {
+	if addr == 0xFFFF {
+		return gbmmu.Memory[0xFFFE]
+	} else if addr == 0xFF00 {
+		return GbIO.GetInput()
+	} else {
+		return gbmmu.Memory[addr]
 	}
-
-	return gbmmu.Memory[memLoc]
 }
 
 // Reads cartridge ROM into Memory

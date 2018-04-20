@@ -2,7 +2,6 @@ package lcd
 
 import (
 	"encoding/binary"
-	"fmt"
 	"image"
 	"image/color"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"../io"
 	"../mmu"
 	"github.com/hajimehoshi/ebiten"
-	"github.com/hajimehoshi/ebiten/ebitenutil"
 )
 
 type GBLCD struct {
@@ -44,13 +42,8 @@ const (
 	LY   = 0xFF44
 )
 
-func (gblcd *GBLCD) reset() {
-	// Initialize screen to white
-	for i := range gblcd.screen {
-		gblcd.screen[i] = color.RGBA{255, 255, 255, 1}
-	}
-
-	gblcd.modeClock = 456
+func (gblcd *GBLCD) InitLCD() {
+	gblcd.mode = 2
 }
 
 const maxCycles = 69905
@@ -96,54 +89,78 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 	// 4194304 is max cycles that can be executed per second
 	// Since running at 60 FPS, each cycle max must be 4194304/60 = 69905
 	for updateCycles < maxCycles {
-		GbCPU.Jumped = false
-		opcode := GbCPU.Regs.PC[:]
-		opcodeInt := binary.LittleEndian.Uint16(opcode)
+		if !GbCPU.Halted {
+			if GbCPU.EIReceived {
+				GbCPU.IME = 1
+			}
+			GbCPU.Jumped = false
+			opcode := GbCPU.Regs.PC[:]
+			opcodeInt := binary.LittleEndian.Uint16(opcode)
 
-		operation := GbMMU.Memory[opcodeInt]
+			operation := GbMMU.Memory[opcodeInt]
 
-		fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-		fmt.Printf("FF00: %v\n", GbMMU.Memory[0xFF00])
+			// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 
-		// if GbMMU.Memory[0xFF40] == 0xD3 {
-		// 	fmt.Printf("LCDC: %v\n", GbMMU.Memory[0xFF40])
-		// }
+			delay := GbCPU.Instrs[operation].Executor()
+			// fmt.Printf("Interrupts: %v\n", GbMMU.Memory[0xFF0F])
+			// fmt.Printf("LCD line: %v\n", gblcd.currentLine)
+			// fmt.Printf("LCD LY: %v\n", GbMMU.Memory[0xFF44])
+			// fmt.Printf("LCD modeclock: %v\n", gblcd.modeClock)
+			// fmt.Printf("LCD current mode: %v\n", gblcd.mode)
+			// fmt.Printf("LCD enabled: %v\n", GbMMU.Memory[0xFF40])
+			// fmt.Printf("OAM: %v\n", GbMMU.Memory[0xFE00:0xFE40])
 
-		delay := GbCPU.Instrs[operation].Executor()
-		GbCPU.Regs.Dump()
+			// Update cycles
+			updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 
-		// if opcode[0] == 68 && opcode[1] == 203 {
-		// 	os.Exit(0)
-		// }
+			// Update graphics
+			gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
 
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("%02X:%02X", opcode[1], opcode[0]))
+			if GbCPU.Jumped {
+				continue
+			} else {
+				nextInstr := binary.LittleEndian.Uint16(GbCPU.Regs.PC) + GbCPU.Instrs[operation].NumOperands
+				// Interesting problem if we don't make a new byte array here
+				// TODO Explain exactly what it is... when I understand it
+				nextInstrAdddr := make([]byte, 2)
+				binary.LittleEndian.PutUint16(nextInstrAdddr, nextInstr)
+				GbCPU.Regs.PC = nextInstrAdddr
+			}
 
-		// Update cycles
-		updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
+			if GbCPU.IME == 1 && GbMMU.Memory[0xFFFE]&(1<<0) == 1 && GbMMU.Memory[0xFF0F]&(1<<0) == 1 {
+				fired := GbMMU.Memory[0xFFFE]&GbMMU.Memory[0xFF0F] == 0x01
 
-		// Update graphics
-		gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
-
-		if GbCPU.Jumped {
-			continue
+				if fired {
+					GbCPU.RST40()
+					GbMMU.Memory[0xFF0F] ^= 1
+					updateCycles += 16
+				}
+			}
 		} else {
-			nextInstr := binary.LittleEndian.Uint16(GbCPU.Regs.PC) + GbCPU.Instrs[operation].NumOperands
-			// Interesting problem if we don't make a new byte array here
-			// TODO Explain exactly what it is... when I understand it
-			nextInstrAdddr := make([]byte, 2)
-			binary.LittleEndian.PutUint16(nextInstrAdddr, nextInstr)
-			GbCPU.Regs.PC = nextInstrAdddr
+			currentIF := GbMMU.ReadByte(0xFF0F)
+
+			if currentIF != GbCPU.IFPreHalt {
+				GbCPU.Halted = false
+			}
+
+			updateCycles++
 		}
 	}
 }
 
 func (gblcd *GBLCD) updateGraphics(cycles int, screen *ebiten.Image) {
-	gblcd.modeClock += int16(cycles)
-	gblcd.setLCDStatus(screen)
+	if lcdEnabled() == 0 {
+		gblcd.modeClock = 0
+		gblcd.currentLine = 0
+		GbMMU.Memory[LY] = 0
+	} else {
+		gblcd.modeClock += int16(cycles)
+		gblcd.setLCDStatus(screen)
+	}
 }
 
 func lcdEnabled() byte {
-	return GbMMU.Memory[STAT] & (1 << 7)
+	return GbMMU.Memory[LCDC] & (1 << 7)
 }
 
 func (gblcd *GBLCD) renderWindow() {
@@ -237,13 +254,9 @@ func renderTile(tileID int) []*Pixel {
 		color.RGBA{0, 0, 0, 255},
 	}
 
-	loTiles := GbMMU.Memory[LCDC]&(1<<4) == 1
-	if GbMMU.Memory[LCDC] == 0xD3 {
-		fmt.Println(GbMMU.Memory[LCDC])
-	}
+	loTiles := GbMMU.Memory[LCDC]&(1<<4) != 0
 
-	// Temporarily flipped for testing
-	if !loTiles {
+	if loTiles {
 		tileID = 0x8000 + (tileID * 16)
 	} else {
 		// If we're in hi tiles set, tile locations are signed
@@ -357,20 +370,6 @@ func loadTilesDebug(beg, end int) *image.RGBA {
 
 func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	switch gblcd.mode {
-	// OAM read mode
-	case 2:
-		if gblcd.modeClock >= 80 {
-			gblcd.modeClock = 0
-			gblcd.mode = 3
-		}
-	// VRAM read mode
-	case 3:
-		if gblcd.modeClock >= 172 {
-			gblcd.modeClock = 0
-			gblcd.mode = 0
-
-			// TODO Write scanline to framebuffer
-		}
 	// HBlank
 	case 0:
 		if gblcd.modeClock >= 204 {
@@ -380,7 +379,12 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 
 			if gblcd.currentLine == 143 {
 				gblcd.mode = 1
+				GbMMU.Memory[STAT] |= (1 << 0)
+				GbMMU.Memory[STAT] &^= (1 << 1)
+				GbMMU.Memory[0xFF0F] ^= 1
 			} else {
+				GbMMU.Memory[STAT] &^= (1 << 0)
+				GbMMU.Memory[STAT] |= (1 << 1)
 				gblcd.mode = 2
 			}
 		}
@@ -392,10 +396,30 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 			GbMMU.Memory[LY]++
 
 			if gblcd.currentLine > 153 {
+				GbMMU.Memory[STAT] &^= (1 << 0)
+				GbMMU.Memory[STAT] |= (1 << 1)
 				gblcd.mode = 2
-				gblcd.currentLine = 0
 				GbMMU.Memory[LY] = 0
+				gblcd.currentLine = 0
 			}
+		}
+	// OAM read mode
+	case 2:
+		if gblcd.modeClock >= 80 {
+			gblcd.modeClock = 0
+			GbMMU.Memory[STAT] |= (1 << 0)
+			GbMMU.Memory[STAT] |= (1 << 1)
+			gblcd.mode = 3
+		}
+	// VRAM read mode
+	case 3:
+		if gblcd.modeClock >= 172 {
+			gblcd.modeClock = 0
+			GbMMU.Memory[STAT] &^= (1 << 0)
+			GbMMU.Memory[STAT] &^= (1 << 1)
+			gblcd.mode = 0
+
+			// TODO Write scanline to framebuffer
 		}
 	}
 }

@@ -119,7 +119,7 @@ func (gbcpu *GBCPU) INCHL() {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	GbMMU.Memory[addr] = result
+	GbMMU.WriteByte(addr, result)
 
 	if GbMMU.Memory[addr] == 0 {
 		gbcpu.Regs.setZero()
@@ -141,7 +141,7 @@ func (gbcpu *GBCPU) DECHL() {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	GbMMU.Memory[addr] = result
+	GbMMU.WriteByte(addr, result)
 
 	if GbMMU.Memory[addr] == 0 {
 		gbcpu.Regs.setZero()
@@ -316,13 +316,25 @@ func (gbcpu *GBCPU) RST(imm byte) {
 	// gbcpu.Regs.Dump()
 }
 
+// Vertical blank interrupt handler
+func (gbcpu *GBCPU) RST40() {
+	// Disable further interrupts while vblank is executing
+	gbcpu.IME = 0
+	gbcpu.EIReceived = false
+
+	// Push current PC to stack
+	gbcpu.pushByteToStack(gbcpu.Regs.PC[1])
+	gbcpu.pushByteToStack(gbcpu.Regs.PC[0])
+
+	// Jump to vblank handler address
+	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, 0x0040)
+}
+
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
 	addrInc := binary.LittleEndian.Uint16(operands) + 1
-	addrIncSlice := make([]byte, 2)
-	binary.LittleEndian.PutUint16(addrIncSlice, addrInc)
-	GbMMU.WriteByte(operands, gbcpu.Regs.sp[0])
-	GbMMU.WriteByte(addrIncSlice, gbcpu.Regs.sp[1])
+	GbMMU.WriteByte(gbcpu.sliceToInt(operands), gbcpu.Regs.sp[0])
+	GbMMU.WriteByte(addrInc, gbcpu.Regs.sp[1])
 }
 
 func (gbcpu *GBCPU) LDSPnn() {
@@ -651,6 +663,7 @@ func (gbcpu *GBCPU) ANDr(reg *byte) {
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.setHalfCarry()
 	gbcpu.Regs.clearCarry()
+	// gbcpu.Regs.Dump()
 }
 
 // ANDn -> e.g. AND i8
@@ -1148,53 +1161,48 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 // a1, s2 are 8-bit components of a 16-bit address
 // Loads value at location a1a2 into reg
 func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
-	*reg = GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
 }
 
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
-	GbMMU.WriteByte([]byte{*a2, *a1}, *reg)
+	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(a1, a2), *reg)
 }
 
 func (gbcpu *GBCPU) LDnnr(reg *byte) {
 	operands := gbcpu.getOperands(2)
-	GbMMU.WriteByte(operands, *reg)
+	operandsInt := gbcpu.sliceToInt(operands)
+	GbMMU.WriteByte(operandsInt, *reg)
 }
 
 func (gbcpu *GBCPU) LDrnn(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	addr := gbcpu.sliceToInt(operands)
-	*reg = GbMMU.Memory[addr]
+	*reg = GbMMU.ReadByte(addr)
 
 }
 
 // LDffrr sets value at (0xFF00+reg1) to reg2
 func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
-	addr := make([]byte, 2)
-	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(*reg1))
-	GbMMU.WriteByte(addr, *reg2)
+	GbMMU.WriteByte(0xFF00+uint16(*reg1), *reg2)
 }
 
 func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
-	*reg1 = GbMMU.Memory[0xFF00+uint16(*reg2)]
+	*reg1 = GbMMU.ReadByte(0xFF00 + uint16(*reg2))
 }
 
 func (gbcpu *GBCPU) LDffnr(reg *byte) {
-	operand := gbcpu.getOperands(1)
-	addr := make([]byte, 2)
-	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0]))
-	GbMMU.WriteByte(addr, *reg)
+	operand := gbcpu.getOperands(1)[0]
+	GbMMU.WriteByte(0xFF00+uint16(operand), *reg)
 }
 
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
-	operand := gbcpu.getOperands(1)
-	addr := make([]byte, 2)
-	binary.LittleEndian.PutUint16(addr, 0xFF00+uint16(operand[0]))
-	*reg = GbMMU.ReadByte(addr)
+	operand := gbcpu.getOperands(1)[0]
+	*reg = GbMMU.ReadByte(0xFF00 + uint16(operand))
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
 	operand := gbcpu.getOperands(1)[0]
-	GbMMU.WriteByte([]byte{*reg2, *reg1}, operand)
+	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(reg1, reg2), operand)
 }
 
 // LDDrHL -> e.g. LDD A,(HL)
@@ -1211,25 +1219,27 @@ func (gbcpu *GBCPU) LDDrHL(reg *byte) {
 // Decrement HL
 func (gbcpu *GBCPU) LDDHLr(reg *byte) {
 	addr := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
-	GbMMU.Memory[addr] = *reg
+	GbMMU.WriteByte(addr, *reg)
 	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(addr - 1)
 }
 
 // Set value at address a1a2 to value in reg
 // Increment reg
 func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
-	GbMMU.WriteByte([]byte{*a2, *a1}, *reg)
+	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(a1, a2), *reg)
 	gbcpu.Regs.incrementHL(1)
 }
 
 // Set value in reg to value at address a1a2
 // Increment HL
 func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
-	*reg = GbMMU.ReadByte([]byte{*a2, *a1})
+	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
 	gbcpu.Regs.incrementHL(1)
 }
 
 func (gbcpu *GBCPU) JPaa() {
+	// gbcpu.Regs.Dump()
+	// fmt.Printf("CFFD: %v\n", GbMMU.Memory[0xCFFD:0xCFFF])
 	jmpAddr := gbcpu.getOperands(2)
 	gbcpu.Regs.PC = jmpAddr
 	gbcpu.Jumped = true
@@ -1376,7 +1386,7 @@ func (gbcpu *GBCPU) JRZn() int {
 
 // Jumps if zero flag = 0
 func (gbcpu *GBCPU) JRNZn() int {
-	gbcpu.Regs.Dump()
+	// gbcpu.Regs.Dump()
 	operand := gbcpu.getOperands(1)[0]
 
 	if gbcpu.Regs.getZero() == 0 {
@@ -1519,9 +1529,12 @@ func (gbcpu *GBCPU) RET() {
 	gbcpu.Jumped = true
 }
 
+// RETI is the same as RET but also enables interrupts
 func (gbcpu *GBCPU) RETI() {
+	// fmt.Printf("CFFD: %v\n", GbMMU.Memory[0xCFF9:0xCFFF])
+	// gbcpu.Regs.Dump()
+	gbcpu.IME = 1
 	gbcpu.RET()
-	// TODO Set flag for interrupts enabled
 }
 
 func (gbcpu *GBCPU) RETZ() int {
@@ -1566,15 +1579,26 @@ func (gbcpu *GBCPU) RETNZ() int {
 	return 0
 }
 
+// EI enables interrupts by setting IME to 1
+// Enables AFTER instruction immediately after
 func (gbcpu *GBCPU) EI() {
-	// TODO
-	// Enables interrupts
+	gbcpu.EIReceived = true
+	// fmt.Printf("IF: %v\n", GbMMU.Memory[0xFF0F])
+	// fmt.Printf("LY: %v\n", GbMMU.Memory[0xFF44])
+	// gbcpu.Regs.Dump()
 }
 
+// DI disables interrupts by setting IME to 0
 func (gbcpu *GBCPU) DI() {
+	gbcpu.IME = 0
+}
 
-	// TODO
-	// Disables interrupts
+func (gbcpu *GBCPU) HALT() {
+	// Save interrupt flag
+	gbcpu.IFPreHalt = GbMMU.ReadByte(0xFF0F)
+
+	// Halt CPU
+	gbcpu.Halted = true
 }
 
 func (gbcpu *GBCPU) CB() int {
@@ -1594,7 +1618,6 @@ func (gbcpu *GBCPU) getOperands(number uint16) []byte {
 	operands := make([]byte, 2)
 	copy(operands, GbMMU.Memory[begin:end])
 
-	// return GbMMU.Memory[begin:end]
 	return operands
 }
 
