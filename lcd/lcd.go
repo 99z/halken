@@ -108,6 +108,7 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 			// fmt.Printf("LCD modeclock: %v\n", gblcd.modeClock)
 			// fmt.Printf("LCD current mode: %v\n", gblcd.mode)
 			// fmt.Printf("LCD enabled: %v\n", GbMMU.Memory[0xFF40])
+			// fmt.Printf("OAM: %v\n", GbMMU.Memory[0xFE00:0xFE40])
 
 			// Update cycles
 			updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
@@ -378,8 +379,12 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 
 			if gblcd.currentLine == 143 {
 				gblcd.mode = 1
+				GbMMU.Memory[STAT] |= (1 << 0)
+				GbMMU.Memory[STAT] &^= (1 << 1)
 				GbMMU.Memory[0xFF0F] ^= 1
 			} else {
+				GbMMU.Memory[STAT] &^= (1 << 0)
+				GbMMU.Memory[STAT] |= (1 << 1)
 				gblcd.mode = 2
 			}
 		}
@@ -391,6 +396,8 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 			GbMMU.Memory[LY]++
 
 			if gblcd.currentLine > 153 {
+				GbMMU.Memory[STAT] &^= (1 << 0)
+				GbMMU.Memory[STAT] |= (1 << 1)
 				gblcd.mode = 2
 				GbMMU.Memory[LY] = 0
 				gblcd.currentLine = 0
@@ -400,12 +407,16 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	case 2:
 		if gblcd.modeClock >= 80 {
 			gblcd.modeClock = 0
+			GbMMU.Memory[STAT] |= (1 << 0)
+			GbMMU.Memory[STAT] |= (1 << 1)
 			gblcd.mode = 3
 		}
 	// VRAM read mode
 	case 3:
 		if gblcd.modeClock >= 172 {
 			gblcd.modeClock = 0
+			GbMMU.Memory[STAT] &^= (1 << 0)
+			GbMMU.Memory[STAT] &^= (1 << 1)
 			gblcd.mode = 0
 
 			// TODO Write scanline to framebuffer

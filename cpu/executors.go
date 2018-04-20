@@ -1198,7 +1198,6 @@ func (gbcpu *GBCPU) LDffnr(reg *byte) {
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
 	operand := gbcpu.getOperands(1)[0]
 	*reg = GbMMU.ReadByte(0xFF00 + uint16(operand))
-	// gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {

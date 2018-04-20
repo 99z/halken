@@ -73,6 +73,11 @@ func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
 		// gbmmu.Memory[0xFF0F] ^= 1
 	} else if addr == 0xFF41 {
 		return
+	} else if addr == 0xFF46 {
+		spriteAddr := int(data) * 256
+		for i := range gbmmu.Memory[0xFE00:0xFEA0] {
+			gbmmu.Memory[0xFE00+i] = gbmmu.Memory[spriteAddr+i]
+		}
 	} else {
 		gbmmu.Memory[addr] = data
 	}
