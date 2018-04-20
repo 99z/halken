@@ -16,12 +16,23 @@ type GBCPU struct {
 	Instrs   map[byte]Instruction
 	InstrsCB map[byte]Instruction
 	Jumped   bool
+	// Interrupt master enabled flag
+	// Not accessed by a mem address and not technically(?) a register
+	// Accessed directly by the CPU
+	IME        byte
+	EIReceived bool
+	Halted     bool
+	// Interrupt flag prior to halting
+	IFPreHalt byte
 }
 
 // InitCPU initializes a new CPU struct
 // Sets Regs and Instrs fields
 // Sets program counter to location
 func (gbcpu *GBCPU) InitCPU() {
+	gbcpu.IME = 1
+	gbcpu.Halted = false
+	gbcpu.EIReceived = false
 	gbcpu.Regs = new(Registers)
 	gbcpu.Regs.InitRegs()
 	// For now, start PC at usual jump destination after

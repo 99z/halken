@@ -28,6 +28,7 @@ func main() {
 	GbMMU.InitMMU()
 	GbCPU.InitCPU()
 	GbIO.InitIO()
+	GbLCD.InitLCD()
 
 	err := GbMMU.LoadCart(cartPath)
 	if err != nil {

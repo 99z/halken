@@ -39,6 +39,7 @@ func (gbmmu *GBMMU) InitMMU() {
 	// I/O register initial values after boot ROM
 	// TODO Might want to just execute boot ROM instead, since
 	// documentation online is sketchy about these
+	gbmmu.Memory[0xFF0F] = 0xE1
 	gbmmu.Memory[0xFF10] = 0x80
 	gbmmu.Memory[0xFF11] = 0xBF
 	gbmmu.Memory[0xFF12] = 0xF3
@@ -68,6 +69,10 @@ func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
 		gbmmu.Memory[0xFFFE] = data
 	} else if addr == 0xFF00 {
 		GbIO.SetCol(data)
+	} else if addr == 0xFF0F {
+		// gbmmu.Memory[0xFF0F] ^= 1
+	} else if addr == 0xFF41 {
+		return
 	} else {
 		gbmmu.Memory[addr] = data
 	}

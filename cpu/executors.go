@@ -316,6 +316,20 @@ func (gbcpu *GBCPU) RST(imm byte) {
 	// gbcpu.Regs.Dump()
 }
 
+// Vertical blank interrupt handler
+func (gbcpu *GBCPU) RST40() {
+	// Disable further interrupts while vblank is executing
+	gbcpu.IME = 0
+	gbcpu.EIReceived = false
+
+	// Push current PC to stack
+	gbcpu.pushByteToStack(gbcpu.Regs.PC[1])
+	gbcpu.pushByteToStack(gbcpu.Regs.PC[0])
+
+	// Jump to vblank handler address
+	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, 0x0040)
+}
+
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
 	addrInc := binary.LittleEndian.Uint16(operands) + 1
@@ -649,6 +663,7 @@ func (gbcpu *GBCPU) ANDr(reg *byte) {
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.setHalfCarry()
 	gbcpu.Regs.clearCarry()
+	// gbcpu.Regs.Dump()
 }
 
 // ANDn -> e.g. AND i8
@@ -1183,6 +1198,7 @@ func (gbcpu *GBCPU) LDffnr(reg *byte) {
 func (gbcpu *GBCPU) LDrffn(reg *byte) {
 	operand := gbcpu.getOperands(1)[0]
 	*reg = GbMMU.ReadByte(0xFF00 + uint16(operand))
+	// gbcpu.Regs.Dump()
 }
 
 func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
@@ -1223,6 +1239,8 @@ func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
 }
 
 func (gbcpu *GBCPU) JPaa() {
+	// gbcpu.Regs.Dump()
+	// fmt.Printf("CFFD: %v\n", GbMMU.Memory[0xCFFD:0xCFFF])
 	jmpAddr := gbcpu.getOperands(2)
 	gbcpu.Regs.PC = jmpAddr
 	gbcpu.Jumped = true
@@ -1512,9 +1530,12 @@ func (gbcpu *GBCPU) RET() {
 	gbcpu.Jumped = true
 }
 
+// RETI is the same as RET but also enables interrupts
 func (gbcpu *GBCPU) RETI() {
+	// fmt.Printf("CFFD: %v\n", GbMMU.Memory[0xCFF9:0xCFFF])
+	// gbcpu.Regs.Dump()
+	gbcpu.IME = 1
 	gbcpu.RET()
-	// TODO Set flag for interrupts enabled
 }
 
 func (gbcpu *GBCPU) RETZ() int {
@@ -1559,14 +1580,26 @@ func (gbcpu *GBCPU) RETNZ() int {
 	return 0
 }
 
-// EI sets IME to FF
+// EI enables interrupts by setting IME to 1
+// Enables AFTER instruction immediately after
 func (gbcpu *GBCPU) EI() {
-	GbMMU.WriteByte(0xFFFF, 0xFF)
+	gbcpu.EIReceived = true
+	// fmt.Printf("IF: %v\n", GbMMU.Memory[0xFF0F])
+	// fmt.Printf("LY: %v\n", GbMMU.Memory[0xFF44])
+	// gbcpu.Regs.Dump()
 }
 
-// DI sets IME to 0
+// DI disables interrupts by setting IME to 0
 func (gbcpu *GBCPU) DI() {
-	GbMMU.WriteByte(0xFFFF, 0x00)
+	gbcpu.IME = 0
+}
+
+func (gbcpu *GBCPU) HALT() {
+	// Save interrupt flag
+	gbcpu.IFPreHalt = GbMMU.ReadByte(0xFF0F)
+
+	// Halt CPU
+	gbcpu.Halted = true
 }
 
 func (gbcpu *GBCPU) CB() int {
