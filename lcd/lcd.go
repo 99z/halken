@@ -9,6 +9,7 @@ import (
 	"../cpu"
 	"../io"
 	"../mmu"
+	"../timer"
 	"github.com/hajimehoshi/ebiten"
 )
 
@@ -50,9 +51,10 @@ const maxCycles = 69905
 const tileBytes = 16
 
 var (
-	GbMMU *mmu.GBMMU
-	GbCPU *cpu.GBCPU
-	GbIO  *io.GBIO
+	GbMMU   *mmu.GBMMU
+	GbCPU   *cpu.GBCPU
+	GbTimer *timer.GBTimer
+	GbIO    *io.GBIO
 
 	frames = 0
 	second = time.Tick(time.Second)
@@ -100,21 +102,17 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 			operation := GbMMU.Memory[opcodeInt]
 
 			// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
+			// fmt.Printf("DIV: %v\n", GbMMU.Memory[0xFF04])
 
 			delay := GbCPU.Instrs[operation].Executor()
-			// fmt.Printf("Interrupts: %v\n", GbMMU.Memory[0xFF0F])
-			// fmt.Printf("LCD line: %v\n", gblcd.currentLine)
-			// fmt.Printf("LCD LY: %v\n", GbMMU.Memory[0xFF44])
-			// fmt.Printf("LCD modeclock: %v\n", gblcd.modeClock)
-			// fmt.Printf("LCD current mode: %v\n", gblcd.mode)
-			// fmt.Printf("LCD enabled: %v\n", GbMMU.Memory[0xFF40])
-			// fmt.Printf("OAM: %v\n", GbMMU.Memory[0xFE00:0xFE40])
 
 			// Update cycles
 			updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
 
 			// Update graphics
 			gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
+
+			GbTimer.Increment(updateCycles)
 
 			if GbCPU.Jumped {
 				continue
@@ -136,6 +134,8 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 					updateCycles += 16
 				}
 			}
+
+			GbTimer.Increment(updateCycles)
 		} else {
 			currentIF := GbMMU.ReadByte(0xFF0F)
 
@@ -245,11 +245,9 @@ func (gblcd *GBLCD) renderSprites() []*Sprite {
 func renderTile(tileID int) []*Pixel {
 	pixels := []*Pixel{}
 
-	// Color map is conflicting on http://www.codeslinger.co.uk/pages/projects/gameboy/graphics.html
-	// 00 is light gray, not white
 	palette := [4]color.RGBA{
-		color.RGBA{120, 170, 120, 255},
 		color.RGBA{205, 255, 205, 255},
+		color.RGBA{120, 170, 120, 255},
 		color.RGBA{35, 85, 35, 255},
 		color.RGBA{0, 0, 0, 255},
 	}
