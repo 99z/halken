@@ -91,6 +91,7 @@ func (gbmmu *GBMMU) ReadByte(addr uint16) byte {
 	} else {
 		return gbmmu.Memory[addr]
 	}
+	return 0
 }
 
 // Reads cartridge ROM into Memory
