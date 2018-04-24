@@ -105,6 +105,7 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 			// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 			// fmt.Printf("CTRL: %02X, STAT: %02X\n", GbMMU.Memory[0xFF40], GbMMU.Memory[0xFF41])
 			// fmt.Printf("IE: %02X, LY: %02X, LYC: %02X\n", GbMMU.Memory[0xFFFE], GbMMU.Memory[0xFF44], GbMMU.Memory[0xFF45])
+			// fmt.Println(GbMMU.Memory[0xFF07])
 
 			delay := GbCPU.Instrs[operation].Executor()
 
@@ -209,7 +210,7 @@ func (gblcd *GBLCD) renderWindow() {
 	for height := 0; height < 18; height++ {
 		for width := 0; width < 20; width++ {
 			// Pass tile ID to renderTile
-			tile := renderTile(int(bgmap[offset]))
+			tile := renderTile(int(bgmap[offset]), false)
 			tiles = append(tiles, tile)
 
 			// Move to the next tile
@@ -256,7 +257,7 @@ func (gblcd *GBLCD) renderSprites() []*Sprite {
 
 		yLoc := spriteData[0] - 16
 		xLoc := spriteData[1] - 8
-		tile := renderTile(int(spriteData[2]))
+		tile := renderTile(int(spriteData[2]), true)
 
 		s := &Sprite{
 			Y:    int(yLoc),
@@ -270,7 +271,7 @@ func (gblcd *GBLCD) renderSprites() []*Sprite {
 	return sprites
 }
 
-func renderTile(tileID int) []*Pixel {
+func renderTile(tileID int, sprites bool) []*Pixel {
 	pixels := []*Pixel{}
 
 	palette := [4]color.RGBA{
@@ -282,7 +283,7 @@ func renderTile(tileID int) []*Pixel {
 
 	loTiles := GbMMU.Memory[LCDC]&(1<<4) != 0
 
-	if loTiles {
+	if loTiles || sprites {
 		tileID = 0x8000 + (tileID * 16)
 	} else {
 		// If we're in hi tiles set, tile locations are signed

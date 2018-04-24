@@ -40,6 +40,7 @@ func (gbmmu *GBMMU) InitMMU() {
 	// TODO Might want to just execute boot ROM instead, since
 	// documentation online is sketchy about these
 	gbmmu.Memory[0xFF0F] = 0xE1
+	gbmmu.Memory[0xFF07] = 0xF8
 	gbmmu.Memory[0xFF10] = 0x80
 	gbmmu.Memory[0xFF11] = 0xBF
 	gbmmu.Memory[0xFF12] = 0xF3
@@ -78,6 +79,8 @@ func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
 		for i := range gbmmu.Memory[0xFE00:0xFEA0] {
 			gbmmu.Memory[0xFE00+i] = gbmmu.Memory[spriteAddr+i]
 		}
+	} else if addr == 0xFF07 {
+		gbmmu.Memory[addr] += data
 	} else {
 		gbmmu.Memory[addr] = data
 	}
