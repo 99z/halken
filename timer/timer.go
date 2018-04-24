@@ -72,10 +72,17 @@ func (gbtimer *GBTimer) checkStep() {
 // and sets the bit to call a timer interrupt if overflow happened
 func (gbtimer *GBTimer) step() {
 	gbtimer.main = 0
+	prevCount := GbMMU.Memory[0xFF05]
 	GbMMU.Memory[0xFF05]++
 
-	if GbMMU.Memory[0xFF05] > 255 {
+	if GbMMU.Memory[0xFF05] < prevCount {
 		GbMMU.Memory[0xFF05] = GbMMU.Memory[0xFF06]
-		GbMMU.Memory[0xFF0F] |= (1 << 2)
+
+		// Set timer interrupt bit
+		// TODO This makes Dr. Mario work
+		GbMMU.Memory[0xFF0F] ^= 3
+
+		// But this makes Flipull work??
+		// GbMMU.Memory[0xFF0F] |= (1 << 2)
 	}
 }

@@ -41,6 +41,7 @@ const (
 	SCY  = 0xFF42
 	SCX  = 0xFF43
 	LY   = 0xFF44
+	LYC  = 0xFF45
 )
 
 func (gblcd *GBLCD) InitLCD() {
@@ -102,7 +103,8 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 			operation := GbMMU.Memory[opcodeInt]
 
 			// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-			// fmt.Printf("DIV: %v\n", GbMMU.Memory[0xFF04])
+			// fmt.Printf("CTRL: %02X, STAT: %02X\n", GbMMU.Memory[0xFF40], GbMMU.Memory[0xFF41])
+			// fmt.Printf("IE: %02X, LY: %02X, LYC: %02X\n", GbMMU.Memory[0xFFFE], GbMMU.Memory[0xFF44], GbMMU.Memory[0xFF45])
 
 			delay := GbCPU.Instrs[operation].Executor()
 
@@ -125,13 +127,19 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 				GbCPU.Regs.PC = nextInstrAdddr
 			}
 
-			if GbCPU.IME == 1 && GbMMU.Memory[0xFFFE]&(1<<0) == 1 && GbMMU.Memory[0xFF0F]&(1<<0) == 1 {
-				fired := GbMMU.Memory[0xFFFE]&GbMMU.Memory[0xFF0F] == 0x01
+			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
+				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
 
-				if fired {
+				if interrupt&1 != 0 {
+					// Run interrupt handler
 					GbCPU.RST40()
+
+					// Set VBlank bit
 					GbMMU.Memory[0xFF0F] ^= 1
 					updateCycles += 16
+				} else if interrupt&4 != 0 {
+					GbCPU.RST50()
+					GbMMU.Memory[0xFF0F] ^= 2
 				}
 			}
 
@@ -143,7 +151,24 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 				GbCPU.Halted = false
 			}
 
+			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
+				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
+
+				if interrupt&1 != 0 {
+					// Run interrupt handler
+					GbCPU.RST40()
+
+					// Set VBlank bit
+					GbMMU.Memory[0xFF0F] ^= 1
+					updateCycles += 16
+				} else if interrupt&4 != 0 {
+					GbCPU.RST50()
+					GbMMU.Memory[0xFF0F] ^= 2
+				}
+			}
+
 			updateCycles++
+			GbTimer.Increment(updateCycles)
 		}
 	}
 }
@@ -153,6 +178,9 @@ func (gblcd *GBLCD) updateGraphics(cycles int, screen *ebiten.Image) {
 		gblcd.modeClock = 0
 		gblcd.currentLine = 0
 		GbMMU.Memory[LY] = 0
+
+		// Clear LCD status
+		GbMMU.Memory[STAT] = 0x80
 	} else {
 		gblcd.modeClock += int16(cycles)
 		gblcd.setLCDStatus(screen)
@@ -300,72 +328,6 @@ func renderTile(tileID int) []*Pixel {
 	return pixels
 }
 
-func loadTilesDebug(beg, end int) *image.RGBA {
-	bg := image.NewRGBA(image.Rect(0, 0, 128, 128))
-	// Tile set #1: 0x8000 - 0x87FF
-	// Tile map #0: 0x9800 - 0x9BFF
-	// Complete list: http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-Graphics
-	tiles := GbMMU.Memory[beg:end]
-
-	palette := [4]color.RGBA{
-		color.RGBA{255, 255, 255, 255},
-		color.RGBA{170, 170, 170, 255},
-		color.RGBA{85, 85, 85, 255},
-		color.RGBA{0, 0, 0, 255},
-	}
-
-	// Iterate over 8x8 tiles
-	numTiles := (end - beg) / 16
-	for tile := 0; tile < numTiles; tile++ {
-		tileX := (tile % 16) * 8
-		tileY := (tile / 16) * 8
-		// Iterate over lines of tiles, represented by 2 bytes
-		for line := 0; line < 8; line++ {
-			hi := tiles[(tile*tileBytes)+line*2]
-			lo := tiles[(tile*tileBytes)+line*2+1]
-
-			// Iterate over individual pixels of tile lines
-			for pix := 0; pix < 8; pix++ {
-				hiBit := (hi >> (7 - uint8(pix))) & 1
-				loBit := (lo >> (7 - uint8(pix))) & 1
-
-				colorIndex := loBit + hiBit*2
-				color := palette[colorIndex]
-
-				pixX := tileX + pix
-				pixY := tileY + line
-
-				bg.Set(pixX, pixY, color)
-			}
-		}
-	}
-
-	return bg
-}
-
-// BG map is 32*32 bytes, each references a tile
-// func (gblcd *GBLCD) renderBackgroundDebug(bgmap []byte) {
-// 	bg := image.NewRGBA(image.Rect(0, 0, 256, 256))
-// 	var tiles [][]*Pixel
-
-// 	// Iterate over 1024 tile IDs
-// 	for _, tileID := range bgmap {
-// 		// Render tile referenced by value in bgmap
-// 		tile := renderTile(int(tileID) * 16)
-// 		tiles = append(tiles, tile)
-// 	}
-
-// 	for i, tile := range tiles {
-// 		for _, px := range tile {
-// 			tileX := ((i % 32) * 8)
-// 			tileY := ((i / 32) * 8)
-// 			bg.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
-// 		}
-// 	}
-
-// 	gblcd.currentBG = bg
-// }
-
 func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	switch gblcd.mode {
 	// HBlank
@@ -379,7 +341,9 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 				gblcd.mode = 1
 				GbMMU.Memory[STAT] |= (1 << 0)
 				GbMMU.Memory[STAT] &^= (1 << 1)
-				GbMMU.Memory[0xFF0F] ^= 1
+
+				// VBlank interrupt
+				GbMMU.Memory[0xFF0F] |= 1
 			} else {
 				GbMMU.Memory[STAT] &^= (1 << 0)
 				GbMMU.Memory[STAT] |= (1 << 1)
@@ -419,5 +383,13 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 
 			// TODO Write scanline to framebuffer
 		}
+	}
+
+	if GbMMU.Memory[LY] == GbMMU.Memory[LYC] {
+		// Set coincidence bit
+		GbMMU.Memory[STAT] |= (1 << 2)
+	} else {
+		// Clear coincidence bit
+		GbMMU.Memory[STAT] &^= (1 << 2)
 	}
 }

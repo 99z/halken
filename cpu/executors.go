@@ -330,6 +330,20 @@ func (gbcpu *GBCPU) RST40() {
 	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, 0x0040)
 }
 
+// Timer interrupt handler
+func (gbcpu *GBCPU) RST50() {
+	// Disable further interrupts while vblank is executing
+	gbcpu.IME = 0
+	gbcpu.EIReceived = false
+
+	// Push current PC to stack
+	gbcpu.pushByteToStack(gbcpu.Regs.PC[1])
+	gbcpu.pushByteToStack(gbcpu.Regs.PC[0])
+
+	// Jump to vblank handler address
+	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, 0x0050)
+}
+
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
 	addrInc := binary.LittleEndian.Uint16(operands) + 1
@@ -1386,7 +1400,6 @@ func (gbcpu *GBCPU) JRZn() int {
 
 // Jumps if zero flag = 0
 func (gbcpu *GBCPU) JRNZn() int {
-	// gbcpu.Regs.Dump()
 	operand := gbcpu.getOperands(1)[0]
 
 	if gbcpu.Regs.getZero() == 0 {
@@ -1591,6 +1604,7 @@ func (gbcpu *GBCPU) EI() {
 // DI disables interrupts by setting IME to 0
 func (gbcpu *GBCPU) DI() {
 	gbcpu.IME = 0
+	gbcpu.EIReceived = false
 }
 
 func (gbcpu *GBCPU) HALT() {
