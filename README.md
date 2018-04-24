@@ -10,6 +10,8 @@
 Halken is a Game Boy emulator written in Go being developed during my time at the [Recurse Center](https://recurse.com).
 The name is one used by HAL Laboratories for a time. HAL was the first company where Satoru Iwata was a video game programmer.
 
+I intend to have lots of comments as well as a document regarding the process. Once I am happy with 32KB games generally working I'll be cleaning the code and writing documentation for others who want to tackle the same project.
+
 ## Working games
 
 1. Tetris :)
