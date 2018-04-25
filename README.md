@@ -14,7 +14,10 @@ I intend to have lots of comments as well as a document regarding the process. O
 
 ## Working games
 
-1. Tetris :)
+**Usage**: `go run main.go /path/to/rom`
+
+1. Tetris
+2. Dr. Mario (timing is a little off?)
 
 ## TODO
 
