@@ -311,6 +311,11 @@ func renderTile(tileID int, sprites bool) []*Pixel {
 
 			colorIndex := loBit + hiBit*2
 			color := palette[colorIndex]
+
+			if sprites && colorIndex == 0 {
+				continue
+			}
+
 			pixX := pix
 			pixY := line
 
