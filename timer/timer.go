@@ -54,11 +54,11 @@ func (gbtimer *GBTimer) checkStep() {
 		// fmt.Println(GbMMU.Memory[0xFF07])
 		switch GbMMU.Memory[0xFF07] & 3 {
 		case 0:
-			selectedClock = 4
-		case 1:
-			selectedClock = 262
-		case 2:
 			selectedClock = 64
+		case 1:
+			selectedClock = 1
+		case 2:
+			selectedClock = 4
 		case 3:
 			selectedClock = 16
 		}
@@ -80,10 +80,6 @@ func (gbtimer *GBTimer) step() {
 		GbMMU.Memory[0xFF05] = GbMMU.Memory[0xFF06]
 
 		// Set timer interrupt bit
-		// TODO This makes Dr. Mario work
-		GbMMU.Memory[0xFF0F] ^= 3
-
-		// But this makes Flipull work??
-		// GbMMU.Memory[0xFF0F] |= (1 << 2)
+		GbMMU.Memory[0xFF0F] |= (1 << 2)
 	}
 }

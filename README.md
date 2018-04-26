@@ -17,7 +17,8 @@ I intend to have lots of comments as well as a document regarding the process. O
 **Usage**: `go run main.go /path/to/rom`
 
 1. Tetris
-2. Dr. Mario (timing is a little off?)
+2. Dr. Mario
+3. Flipull
 
 ## TODO
 

@@ -71,7 +71,7 @@ func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
 	} else if addr == 0xFF00 {
 		GbIO.SetCol(data)
 	} else if addr == 0xFF0F {
-		// gbmmu.Memory[0xFF0F] ^= 1
+		// gbmmu.Memory[0xFF0F] |= (1 << 0)
 	} else if addr == 0xFF41 {
 		return
 	} else if addr == 0xFF46 {

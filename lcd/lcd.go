@@ -104,8 +104,8 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 
 			// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
 			// fmt.Printf("CTRL: %02X, STAT: %02X\n", GbMMU.Memory[0xFF40], GbMMU.Memory[0xFF41])
-			// fmt.Printf("IE: %02X, LY: %02X, LYC: %02X\n", GbMMU.Memory[0xFFFE], GbMMU.Memory[0xFF44], GbMMU.Memory[0xFF45])
-			// fmt.Println(GbMMU.Memory[0xFF07])
+			// fmt.Printf("IE: %02X, IF: %02X, LY: %02X\n", GbMMU.Memory[0xFFFE], GbMMU.Memory[0xFF0F], GbMMU.Memory[0xFF44])
+			// fmt.Println(GbMMU.Memory[0xFF0F])
 
 			delay := GbCPU.Instrs[operation].Executor()
 
@@ -135,12 +135,15 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 					// Run interrupt handler
 					GbCPU.RST40()
 
-					// Set VBlank bit
-					GbMMU.Memory[0xFF0F] ^= 1
+					// Clear VBlank interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 0)
 					updateCycles += 16
 				} else if interrupt&4 != 0 {
 					GbCPU.RST50()
-					GbMMU.Memory[0xFF0F] ^= 2
+
+					// Clear timer interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 2)
+					updateCycles += 16
 				}
 			}
 
@@ -159,12 +162,15 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 					// Run interrupt handler
 					GbCPU.RST40()
 
-					// Set VBlank bit
-					GbMMU.Memory[0xFF0F] ^= 1
+					// Clear VBlank interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 0)
 					updateCycles += 16
 				} else if interrupt&4 != 0 {
 					GbCPU.RST50()
-					GbMMU.Memory[0xFF0F] ^= 2
+
+					// Clear timer interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 2)
+					updateCycles += 16
 				}
 			}
 
@@ -349,7 +355,7 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 				GbMMU.Memory[STAT] &^= (1 << 1)
 
 				// VBlank interrupt
-				GbMMU.Memory[0xFF0F] |= 1
+				GbMMU.Memory[0xFF0F] |= (1 << 0)
 			} else {
 				GbMMU.Memory[STAT] &^= (1 << 0)
 				GbMMU.Memory[STAT] |= (1 << 1)
