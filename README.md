@@ -19,6 +19,8 @@ I intend to have lots of comments as well as a document regarding the process. O
 1. Tetris
 2. Dr. Mario
 3. Flipull
+4. World Bowling
+5. Minesweeper
 
 ## TODO
 

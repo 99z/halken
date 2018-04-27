@@ -89,7 +89,15 @@ func (regs *Registers) SplitWord(rr uint16) (byte, byte) {
 }
 
 func (regs *Registers) JoinRegs(reg1, reg2 *byte) uint16 {
-	return uint16(*reg2) | uint16(*reg1)<<8
+	result := uint16(*reg2) | uint16(*reg1)<<8
+
+	// Handle OOB
+	// TODO Probably a potential issue elsewhere, change mem model to fix
+	if result >= 0xFFFF {
+		result--
+	}
+
+	return result
 }
 
 // incrementSP converts current SP to an integer,

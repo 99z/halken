@@ -149,6 +149,7 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 
 			GbTimer.Increment(updateCycles)
 		} else {
+			instrTotal := 0
 			currentIF := GbMMU.ReadByte(0xFF0F)
 
 			if currentIF != GbCPU.IFPreHalt {
@@ -165,17 +166,20 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 					// Clear VBlank interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 0)
 					updateCycles += 16
+					instrTotal += 16
 				} else if interrupt&4 != 0 {
 					GbCPU.RST50()
 
 					// Clear timer interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 2)
+					instrTotal += 16
 					updateCycles += 16
 				}
 			}
 
 			updateCycles++
 			GbTimer.Increment(updateCycles)
+			gblcd.updateGraphics(1+instrTotal, screen)
 		}
 	}
 }
@@ -199,7 +203,12 @@ func lcdEnabled() byte {
 }
 
 func (gblcd *GBLCD) renderWindow() {
+	useAltbgmap := GbMMU.Memory[LCDC]&(1<<3) != 0
 	bgmap := GbMMU.Memory[0x9800:0x9C00]
+
+	if useAltbgmap {
+		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
+	}
 
 	// ((y tile offset * num pixels per row) + (x tile offset * 8)) / 8
 	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
