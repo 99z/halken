@@ -1,3 +1,8 @@
+// Package cpu executors contains implementations of all non-CB prefixed
+// Sharp LR35902 instructions
+// Non-CB prefixed means these are only run if the instruction we received
+// is not `CB .. ..`
+// Executor function field on the Instruction struct executes these
 package cpu
 
 import (
@@ -72,12 +77,23 @@ func (gbcpu *GBCPU) LDrn(reg *byte) {
 
 }
 
-func (gbcpu *GBCPU) LDrrr(reg1, reg2, op *byte) {
-	gbcpu.Regs.writePair(reg1, reg2, []byte{*op, *op})
+// INCrr -> e.g. INC BC
+// Increments register pair by 1
+// Flags: none
+func (gbcpu *GBCPU) INCrr(reg1, reg2 *byte) {
+	rr := gbcpu.Regs.JoinRegs(reg1, reg2)
+	rr++
+	*reg1, *reg2 = gbcpu.Regs.SplitWord(rr)
 }
 
-func (gbcpu *GBCPU) INCrr(reg1, reg2 *byte) {
-	gbcpu.Regs.incrementPair(reg1, reg2, 1)
+// DECrr -> e.g. DEC BC
+// Decrements register pair by 1
+// Flags: none
+func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
+	// gbcpu.Regs.decrementPair(reg1, reg2, 1)
+	rr := gbcpu.Regs.JoinRegs(reg1, reg2)
+	rr--
+	*reg1, *reg2 = gbcpu.Regs.SplitWord(rr)
 }
 
 // INCr -> e.g. INC B
@@ -107,7 +123,8 @@ func (gbcpu *GBCPU) INCr(reg *byte) {
 	gbcpu.Regs.clearSubtract()
 }
 
-// Increment value at memory location reg1reg2
+// INCHL -> e.g. INC (HL)
+// Increment value at addr (HL)
 // Flags: Z0H-
 func (gbcpu *GBCPU) INCHL() {
 	addr := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
@@ -130,6 +147,8 @@ func (gbcpu *GBCPU) INCHL() {
 	gbcpu.Regs.clearSubtract()
 }
 
+// DECHL -> e.g. DEC (HL)
+// Decrement value at addr (HL)
 // Flags: Z1H-
 func (gbcpu *GBCPU) DECHL() {
 	addr := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
@@ -152,21 +171,22 @@ func (gbcpu *GBCPU) DECHL() {
 	gbcpu.Regs.setSubtract()
 }
 
+// INCSP -> e.g. INC SP
+// Increment value of stack pointer by 1
+// Flags: none
 func (gbcpu *GBCPU) INCSP() {
 	newSP := gbcpu.sliceToInt(gbcpu.Regs.sp)
 	newSP++
 	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, newSP)
 }
 
+// DECSP -> e.g. DEC SP
+// Decrement value of stack pointer by 1
+// Flags: none
 func (gbcpu *GBCPU) DECSP() {
 	newSP := gbcpu.sliceToInt(gbcpu.Regs.sp)
 	newSP--
 	binary.LittleEndian.PutUint16(gbcpu.Regs.sp, newSP)
-}
-
-func (gbcpu *GBCPU) INCrn(reg *byte) {
-	operand := gbcpu.getOperands(1)
-	*reg = operand[0]
 }
 
 // DECr -> e.g. DEC B
@@ -195,12 +215,6 @@ func (gbcpu *GBCPU) DECr(reg *byte) {
 	// Set subtract flag
 	gbcpu.Regs.setSubtract()
 
-}
-
-func (gbcpu *GBCPU) DECrr(reg1, reg2 *byte) {
-	rr := gbcpu.Regs.JoinRegs(reg1, reg2)
-	rr--
-	*reg1, *reg2 = gbcpu.Regs.SplitWord(rr)
 }
 
 // RLCA performs 8-bit rotation to the left
@@ -304,6 +318,8 @@ func (gbcpu *GBCPU) RRA() {
 
 // RST pushes current PC + 3 onto stack
 // MSB of PC is set to 0x00, LSB is set to argument
+// Handles 0000,0008,0010,0018,0020,0028,0030,0038 which come from ROM
+// Flags: none
 func (gbcpu *GBCPU) RST(imm byte) {
 	nextInstr := gbcpu.sliceToInt(gbcpu.Regs.PC) + 1
 	nextInstrBytes := make([]byte, 2)
@@ -313,11 +329,12 @@ func (gbcpu *GBCPU) RST(imm byte) {
 
 	gbcpu.Regs.PC = []byte{imm, 0x00}
 	gbcpu.Jumped = true
-	// gbcpu.Regs.Dump()
 }
 
-// Vertical blank interrupt handler
-func (gbcpu *GBCPU) RST40() {
+// RSTI runs interrupt handlers
+// Does not have a corresponding opcode, but is slightly different than RST
+// Flags: none
+func (gbcpu *GBCPU) RSTI(addr byte) {
 	// Disable further interrupts while vblank is executing
 	gbcpu.IME = 0
 	gbcpu.EIReceived = false
@@ -327,23 +344,14 @@ func (gbcpu *GBCPU) RST40() {
 	gbcpu.pushByteToStack(gbcpu.Regs.PC[0])
 
 	// Jump to vblank handler address
-	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, 0x0040)
+	gbcpu.Regs.PC = []byte{addr, 0x00}
+	gbcpu.Jumped = true
 }
 
-// Timer interrupt handler
-func (gbcpu *GBCPU) RST50() {
-	// Disable further interrupts while vblank is executing
-	gbcpu.IME = 0
-	gbcpu.EIReceived = false
-
-	// Push current PC to stack
-	gbcpu.pushByteToStack(gbcpu.Regs.PC[1])
-	gbcpu.pushByteToStack(gbcpu.Regs.PC[0])
-
-	// Jump to vblank handler address
-	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, 0x0050)
-}
-
+// LDaaSP -> e.g. LD (a16),SP
+// Loads value of SP into addr provided by operands
+// Since SP is 2 bytes, we write to (a16) and (a16 + 1)
+// Flags: none
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
 	addrInc := binary.LittleEndian.Uint16(operands) + 1
@@ -351,13 +359,12 @@ func (gbcpu *GBCPU) LDaaSP() {
 	GbMMU.WriteByte(addrInc, gbcpu.Regs.sp[1])
 }
 
+// LDSPnn -> e.g. LD SP,i16
+// Loads 16 bit value from next 2 bytes into SP
+// Flags: none
 func (gbcpu *GBCPU) LDSPnn() {
 	operands := gbcpu.getOperands(2)
-	// newSP := make([]byte, 2)
-	// newSP[1] = operands[1]
-	// newSP[0] = operands[0]
 	gbcpu.Regs.sp = operands
-	// gbcpu.Regs.Dump()
 }
 
 // ADDrr -> e.g. ADD A,B
@@ -398,7 +405,7 @@ func (gbcpu *GBCPU) ADDrr(reg1, reg2 *byte) {
 	gbcpu.Regs.clearSubtract()
 }
 
-// ADDrn -> e.g. ADD A,i8
+// ADDAn -> e.g. ADD A,i8
 // Values of reg and i8 are added together
 // Result is written into reg
 // Flags: Z0HC
@@ -435,7 +442,7 @@ func (gbcpu *GBCPU) ADDAn() {
 	gbcpu.Regs.clearSubtract()
 }
 
-// ADCrn -> e.g. ADC A,i8
+// ADCAn -> e.g. ADC A,i8
 // Values of operand and carry flag are added to reg
 // Result is written into reg
 // Flags: Z0HC
@@ -502,10 +509,12 @@ func (gbcpu *GBCPU) ADCrr(reg1, reg2 *byte) {
 	gbcpu.Regs.clearSubtract()
 }
 
+// ADCAHL -> e.g. ADC A,(HL)
+// Adds value at addr (HL) + carry bit to reg A
 // Flags: Z0HC
-func (gbcpu *GBCPU) ADCraa(reg, a1, a2 *byte) {
+func (gbcpu *GBCPU) ADCAHL() {
 	carry := int(gbcpu.Regs.getCarry())
-	operand := GbMMU.Memory[gbcpu.Regs.JoinRegs(a1, a2)]
+	operand := GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)]
 
 	// Check for carry
 	if ((int(gbcpu.Regs.a) & 0xFF) + (int(operand) & 0xFF) + carry) > 0xFF {
@@ -536,16 +545,18 @@ func (gbcpu *GBCPU) ADCraa(reg, a1, a2 *byte) {
 	gbcpu.Regs.clearSubtract()
 }
 
+// ADDAHL -> e.g. ADD A,(HL)
+// Adds value at addr (HL) to reg A
 // Flags: Z0HC
-func (gbcpu *GBCPU) ADDraa(reg, a1, a2 *byte) {
-	operand := GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
-	oldVal := *reg
-	result := *reg + operand
-	hc := (((*reg & 0xf) + (operand & 0xf)) & 0x10) == 0x10
-	*reg = result
+func (gbcpu *GBCPU) ADDAHL() {
+	operand := GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)]
+	oldVal := gbcpu.Regs.a
+	result := gbcpu.Regs.a + operand
+	hc := (((gbcpu.Regs.a & 0xf) + (operand & 0xf)) & 0x10) == 0x10
+	gbcpu.Regs.a = result
 
 	// Check for zero
-	if *reg == 0x0 {
+	if gbcpu.Regs.a == 0x0 {
 		gbcpu.Regs.setZero()
 	} else {
 		gbcpu.Regs.clearZero()
@@ -553,7 +564,7 @@ func (gbcpu *GBCPU) ADDraa(reg, a1, a2 *byte) {
 
 	// Check for carry
 	// Occurred if byte overflows
-	if *reg < oldVal {
+	if gbcpu.Regs.a < oldVal {
 		gbcpu.Regs.setCarry()
 	} else {
 		gbcpu.Regs.clearCarry()
@@ -637,6 +648,8 @@ func (gbcpu *GBCPU) ADDSPs() {
 	gbcpu.Regs.clearSubtract()
 }
 
+// ADDHLSP -> e.g. ADD HL,SP
+// Adds HL and SP, then sets HL to result
 // Flags: -0HC
 func (gbcpu *GBCPU) ADDHLSP() {
 	hl := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
@@ -677,7 +690,6 @@ func (gbcpu *GBCPU) ANDr(reg *byte) {
 	gbcpu.Regs.clearSubtract()
 	gbcpu.Regs.setHalfCarry()
 	gbcpu.Regs.clearCarry()
-	// gbcpu.Regs.Dump()
 }
 
 // ANDn -> e.g. AND i8
@@ -700,9 +712,11 @@ func (gbcpu *GBCPU) ANDn() {
 	gbcpu.Regs.clearCarry()
 }
 
+// ANDHL -> e.g. AND (HL)
+// Bitwise AND of value at addr (HL) into A
 // Flags: Z010
-func (gbcpu *GBCPU) ANDaa(a1, a2 *byte) {
-	val := GbMMU.Memory[gbcpu.Regs.JoinRegs(a1, a2)]
+func (gbcpu *GBCPU) ANDHL() {
+	val := GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)]
 	gbcpu.Regs.a &= val
 
 	if gbcpu.Regs.a == 0 {
@@ -892,9 +906,12 @@ func (gbcpu *GBCPU) SUBr(reg *byte) {
 	gbcpu.Regs.setSubtract()
 }
 
+// SUBHL -> e.g. SUB (HL)
+// Subtract value at addr (HL) from A
+// Write result to A
 // Flags: Z1HC
-func (gbcpu *GBCPU) SUBaa(a1, a2 *byte) {
-	operand := GbMMU.Memory[binary.LittleEndian.Uint16([]byte{*a2, *a1})]
+func (gbcpu *GBCPU) SUBHL() {
+	operand := GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)]
 	oldVal := gbcpu.Regs.a
 	hc := (((gbcpu.Regs.a & 0xf) - (operand & 0xf)) & 0x10) == 0x10
 	gbcpu.Regs.a = gbcpu.Regs.a - operand
@@ -999,11 +1016,14 @@ func (gbcpu *GBCPU) SBCAn() {
 	gbcpu.Regs.setSubtract()
 }
 
+// SBCAHL -> e.g. SBC A,(HL)
+// Subtract value at addr (HL) and carry flag from reg A
+// Write result to reg A
 // Flags: Z1HC
-func (gbcpu *GBCPU) SBCraa(reg, a1, a2 *byte) {
+func (gbcpu *GBCPU) SBCAHL() {
 	carry := gbcpu.Regs.getCarry()
-	operand := GbMMU.Memory[gbcpu.Regs.JoinRegs(a1, a2)]
-	result := (int(*reg) - int(operand)) - int(carry)
+	operand := GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)]
+	result := (int(gbcpu.Regs.a) - int(operand)) - int(carry)
 
 	if result < 0 {
 		gbcpu.Regs.setCarry()
@@ -1019,13 +1039,13 @@ func (gbcpu *GBCPU) SBCraa(reg, a1, a2 *byte) {
 		gbcpu.Regs.clearZero()
 	}
 
-	if ((result ^ int(*reg) ^ int(operand)) & 0x10) == 0x10 {
+	if ((result ^ int(gbcpu.Regs.a) ^ int(operand)) & 0x10) == 0x10 {
 		gbcpu.Regs.setHalfCarry()
 	} else {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	*reg = byte(result)
+	gbcpu.Regs.a = byte(result)
 
 	gbcpu.Regs.setSubtract()
 }
@@ -1148,13 +1168,12 @@ func (gbcpu *GBCPU) CPaa(a1, a2 *byte) {
 	gbcpu.Regs.setSubtract()
 }
 
-// PUSHrr
+// PUSHrr -> e.g PUSH BC
 // Copies reg1reg2 into addr (SP)
+// Flags: none
 func (gbcpu *GBCPU) PUSHrr(reg1, reg2 *byte) {
 	gbcpu.pushByteToStack(*reg1)
 	gbcpu.pushByteToStack(*reg2)
-	// gbcpu.Regs.f &= 0xF0
-	// gbcpu.Regs.Dump()
 }
 
 // POPrr copies 2 bytes at addr (SP) into the operand
@@ -1168,55 +1187,71 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 	// Flags are masked out
 	// https://forums.nesdev.com/viewtopic.php?f=20&t=12815
 	gbcpu.Regs.f &= 0xF0
-
-	// gbcpu.Regs.Dump()
 }
 
-// a1, s2 are 8-bit components of a 16-bit address
-// Loads value at location a1a2 into reg
+// LDraa -> e.g. LD A,(BC)
+// Loads value at addr (a1a2) into reg
+// Flags: none
 func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
 	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
 }
 
+// LDaar -> e.g. LD (BC),A
+// Loads reg into value at addr (a1a2)
+// Flags: none
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
 	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(a1, a2), *reg)
 }
 
-func (gbcpu *GBCPU) LDnnr(reg *byte) {
+// LDaaA -> e.g. LD (a16),A
+// Loads reg A into addr specified by next 2 bytes
+// Flags: none
+func (gbcpu *GBCPU) LDaaA(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	operandsInt := gbcpu.sliceToInt(operands)
 	GbMMU.WriteByte(operandsInt, *reg)
 }
 
-func (gbcpu *GBCPU) LDrnn(reg *byte) {
+// LDAaa -> e.g. LD A,(a16)
+// Loads value at addr specified by next 2 bytes into A
+// Flags: none
+func (gbcpu *GBCPU) LDAaa(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	addr := gbcpu.sliceToInt(operands)
 	*reg = GbMMU.ReadByte(addr)
-
 }
 
-// LDffrr sets value at (0xFF00+reg1) to reg2
-func (gbcpu *GBCPU) LDffrr(reg1, reg2 *byte) {
-	GbMMU.WriteByte(0xFF00+uint16(*reg1), *reg2)
+// LDffCA -> e.g. LD ($FF00+C),A
+// Sets value at addr (0xFF00+C) to A
+func (gbcpu *GBCPU) LDffCA() {
+	GbMMU.WriteByte(0xFF00+uint16(gbcpu.Regs.c), gbcpu.Regs.a)
 }
 
-func (gbcpu *GBCPU) LDrffr(reg1, reg2 *byte) {
-	*reg1 = GbMMU.ReadByte(0xFF00 + uint16(*reg2))
+// LDAffC -> e.g. LD A,($FF00+C)
+// Sets A to value at addr (0xFF00+C)
+func (gbcpu *GBCPU) LDAffC() {
+	gbcpu.Regs.a = GbMMU.ReadByte(0xFF00 + uint16(gbcpu.Regs.c))
 }
 
-func (gbcpu *GBCPU) LDffnr(reg *byte) {
+// LDffnA -> e.g. LD ($FF00+a8),A
+// Loads A into value at addr ($FF00+a8)
+func (gbcpu *GBCPU) LDffnA() {
 	operand := gbcpu.getOperands(1)[0]
-	GbMMU.WriteByte(0xFF00+uint16(operand), *reg)
+	GbMMU.WriteByte(0xFF00+uint16(operand), gbcpu.Regs.a)
 }
 
-func (gbcpu *GBCPU) LDrffn(reg *byte) {
+// LDAffn -> e.g. LD A,($FF00+a8)
+// Loads value at addr ($FF00+a8) into A
+func (gbcpu *GBCPU) LDAffn() {
 	operand := gbcpu.getOperands(1)[0]
-	*reg = GbMMU.ReadByte(0xFF00 + uint16(operand))
+	gbcpu.Regs.a = GbMMU.ReadByte(0xFF00 + uint16(operand))
 }
 
-func (gbcpu *GBCPU) LDaan(reg1, reg2 *byte) {
+// LDHLn -> e.g. LD (HL),i8
+// Loads 8 bit immediate into addr (HL)
+func (gbcpu *GBCPU) LDHLn() {
 	operand := gbcpu.getOperands(1)[0]
-	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(reg1, reg2), operand)
+	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l), operand)
 }
 
 // LDDrHL -> e.g. LDD A,(HL)
@@ -1237,34 +1272,44 @@ func (gbcpu *GBCPU) LDDHLr(reg *byte) {
 	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(addr - 1)
 }
 
+// LDIHLA -> e.g. LDI (HL),A
 // Set value at address a1a2 to value in reg
 // Increment reg
-func (gbcpu *GBCPU) LDIaaR(a1, a2, reg *byte) {
-	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(a1, a2), *reg)
-	gbcpu.Regs.incrementHL(1)
+func (gbcpu *GBCPU) LDIHLA() {
+	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l), gbcpu.Regs.a)
+	hl := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
+	hl++
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(hl)
 }
 
+// LDIAHL -> e.g. LDI A,(HL)
 // Set value in reg to value at address a1a2
 // Increment HL
-func (gbcpu *GBCPU) LDIRaa(reg, a1, a2 *byte) {
-	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
-	gbcpu.Regs.incrementHL(1)
+func (gbcpu *GBCPU) LDIAHL() {
+	gbcpu.Regs.a = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l))
+	hl := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
+	hl++
+	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(hl)
 }
 
+// JPaa -> e.g. JP a16
+// Jumps to addr a16
 func (gbcpu *GBCPU) JPaa() {
-	// gbcpu.Regs.Dump()
-	// fmt.Printf("CFFD: %v\n", GbMMU.Memory[0xCFFD:0xCFFF])
 	jmpAddr := gbcpu.getOperands(2)
 	gbcpu.Regs.PC = jmpAddr
 	gbcpu.Jumped = true
 }
 
+// JPHL -> e.g. JP (HL)
+// Jumps to addr specified by addr (HL)
 func (gbcpu *GBCPU) JPHL() {
 	addr := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
 	binary.LittleEndian.PutUint16(gbcpu.Regs.PC, addr)
 	gbcpu.Jumped = true
 }
 
+// JPZaa -> e.g. JP Z,a16
+// Jumps to a16 if Z is set
 func (gbcpu *GBCPU) JPZaa() int {
 	z := ((gbcpu.Regs.f >> 7) & 1)
 	if z != 0 {
@@ -1275,6 +1320,8 @@ func (gbcpu *GBCPU) JPZaa() int {
 	return 0
 }
 
+// JPNZaa -> e.g. JP NZ,a16
+// Jumps to a16 if Z is not set
 func (gbcpu *GBCPU) JPNZaa() int {
 	z := ((gbcpu.Regs.f >> 7) & 1)
 	if z == 0 {
@@ -1285,6 +1332,8 @@ func (gbcpu *GBCPU) JPNZaa() int {
 	return 0
 }
 
+// JPCaa -> e.g. JP C,a16
+// Jumps to a16 if C is set
 func (gbcpu *GBCPU) JPCaa() int {
 	c := ((gbcpu.Regs.f >> 4) & 1)
 	if c != 0 {
@@ -1295,6 +1344,8 @@ func (gbcpu *GBCPU) JPCaa() int {
 	return 0
 }
 
+// JPNCaa -> e.g. JP NC,a16
+// Jumps to a16 if C is not set
 func (gbcpu *GBCPU) JPNCaa() int {
 	c := ((gbcpu.Regs.f >> 4) & 1)
 	if c == 0 {
@@ -1318,9 +1369,10 @@ func (gbcpu *GBCPU) CALLaa() {
 	gbcpu.Regs.PC = operands
 
 	gbcpu.Jumped = true
-	// gbcpu.Regs.Dump()
 }
 
+// CALLZaa -> e.g. CALL Z,a16
+// Performs CALL to a16 if Z is set
 func (gbcpu *GBCPU) CALLZaa() int {
 	z := ((gbcpu.Regs.f >> 7) & 1)
 	if z != 0 {
@@ -1331,6 +1383,8 @@ func (gbcpu *GBCPU) CALLZaa() int {
 	return 0
 }
 
+// CALLNZaa -> e.g. CALL NZ,a16
+// Performs CALL to a16 if Z is not set
 func (gbcpu *GBCPU) CALLNZaa() int {
 	z := ((gbcpu.Regs.f >> 7) & 1)
 	if z == 0 {
@@ -1341,6 +1395,8 @@ func (gbcpu *GBCPU) CALLNZaa() int {
 	return 0
 }
 
+// CALLCaa -> e.g. CALL C,a16
+// Performs CALL to a16 if C is set
 func (gbcpu *GBCPU) CALLCaa() int {
 	c := ((gbcpu.Regs.f >> 4) & 1)
 	if c != 0 {
@@ -1351,6 +1407,8 @@ func (gbcpu *GBCPU) CALLCaa() int {
 	return 0
 }
 
+// CALLNCaa -> e.g. CALL NC,a16
+// Performs CALL to a16 if Z is not set
 func (gbcpu *GBCPU) CALLNCaa() int {
 	c := ((gbcpu.Regs.f >> 4) & 1)
 	if c == 0 {
@@ -1361,6 +1419,7 @@ func (gbcpu *GBCPU) CALLNCaa() int {
 	return 0
 }
 
+// JRn -> e.g. JR s8
 // Add byte at PC + 1 to PC, and set PC to that value
 func (gbcpu *GBCPU) JRn() {
 	operand := gbcpu.getOperands(1)[0]
@@ -1377,6 +1436,8 @@ func (gbcpu *GBCPU) JRn() {
 	gbcpu.Jumped = true
 }
 
+// JRZn -> e.g. JR Z,s8
+// Performs JR to PC + s8 if Z is set
 func (gbcpu *GBCPU) JRZn() int {
 	operand := gbcpu.getOperands(1)[0]
 
@@ -1398,7 +1459,8 @@ func (gbcpu *GBCPU) JRZn() int {
 	return 0
 }
 
-// Jumps if zero flag = 0
+// JRNZn -> e.g. JR NZ,s8
+// Performs JR to PC + s8 if Z is not set
 func (gbcpu *GBCPU) JRNZn() int {
 	operand := gbcpu.getOperands(1)[0]
 
@@ -1420,6 +1482,8 @@ func (gbcpu *GBCPU) JRNZn() int {
 	return 0
 }
 
+// JRCn -> e.g. JR C,s8
+// Performs JR to PC + s8 if C is set
 func (gbcpu *GBCPU) JRCn() int {
 	operand := gbcpu.getOperands(1)[0]
 
@@ -1441,9 +1505,8 @@ func (gbcpu *GBCPU) JRCn() int {
 	return 0
 }
 
-// JRNCn -> e.g. JR NC,FC
-// Adds operand to PC
-// Jumps to new addr if carry is not set
+// JRNCn -> e.g. JR NC,s8
+// Performs JR to PC + s8 if C is not set
 func (gbcpu *GBCPU) JRNCn() int {
 	operand := gbcpu.getOperands(1)[0]
 
@@ -1465,6 +1528,7 @@ func (gbcpu *GBCPU) JRNCn() int {
 	return 0
 }
 
+// CCF clears the carry flag
 // Flags: -00C
 func (gbcpu *GBCPU) CCF() {
 	if gbcpu.Regs.getCarry() != 0 {
@@ -1519,6 +1583,7 @@ func (gbcpu *GBCPU) DAA() {
 	gbcpu.Regs.a = byte(a)
 }
 
+// SCF sets the carry flag
 // Flags: -001
 func (gbcpu *GBCPU) SCF() {
 	gbcpu.Regs.clearSubtract()
@@ -1526,7 +1591,7 @@ func (gbcpu *GBCPU) SCF() {
 	gbcpu.Regs.setCarry()
 }
 
-// Bitwise complement of A
+// CPL performs bitwise complement of A into a
 // Flags: -11-
 func (gbcpu *GBCPU) CPL() {
 	gbcpu.Regs.a = ^gbcpu.Regs.a
@@ -1544,14 +1609,12 @@ func (gbcpu *GBCPU) RET() {
 
 // RETI is the same as RET but also enables interrupts
 func (gbcpu *GBCPU) RETI() {
-	// fmt.Printf("CFFD: %v\n", GbMMU.Memory[0xCFF9:0xCFFF])
-	// gbcpu.Regs.Dump()
 	gbcpu.IME = 1
 	gbcpu.RET()
 }
 
+// RETZ performs RET if Z is set
 func (gbcpu *GBCPU) RETZ() int {
-
 	if gbcpu.Regs.getZero() != 0 {
 		gbcpu.RET()
 		return 12
@@ -1560,6 +1623,18 @@ func (gbcpu *GBCPU) RETZ() int {
 	return 0
 }
 
+// RETNZ performs RET if Z is not set
+func (gbcpu *GBCPU) RETNZ() int {
+	z := ((gbcpu.Regs.f >> 7) & 1)
+	if z == 0 {
+		gbcpu.RET()
+		return 12
+	}
+
+	return 0
+}
+
+// RETC performs RET if C is set
 func (gbcpu *GBCPU) RETC() int {
 	c := ((gbcpu.Regs.f >> 4) & 1)
 	if c != 0 {
@@ -1570,21 +1645,10 @@ func (gbcpu *GBCPU) RETC() int {
 	return 0
 }
 
+// RETNC performs RET if C is not set
 func (gbcpu *GBCPU) RETNC() int {
 	c := ((gbcpu.Regs.f >> 4) & 1)
 	if c == 0 {
-		gbcpu.RET()
-		return 12
-	}
-
-	return 0
-}
-
-// RETNZ pops the top of the stack into the program counter
-// if Z is not set
-func (gbcpu *GBCPU) RETNZ() int {
-	z := ((gbcpu.Regs.f >> 7) & 1)
-	if z == 0 {
 		gbcpu.RET()
 		return 12
 	}
@@ -1596,9 +1660,6 @@ func (gbcpu *GBCPU) RETNZ() int {
 // Enables AFTER instruction immediately after
 func (gbcpu *GBCPU) EI() {
 	gbcpu.EIReceived = true
-	// fmt.Printf("IF: %v\n", GbMMU.Memory[0xFF0F])
-	// fmt.Printf("LY: %v\n", GbMMU.Memory[0xFF44])
-	// gbcpu.Regs.Dump()
 }
 
 // DI disables interrupts by setting IME to 0
@@ -1607,6 +1668,7 @@ func (gbcpu *GBCPU) DI() {
 	gbcpu.EIReceived = false
 }
 
+// HALT stops the CPU until an interrupt occurs
 func (gbcpu *GBCPU) HALT() {
 	// Save interrupt flag
 	gbcpu.IFPreHalt = GbMMU.ReadByte(0xFF0F)
@@ -1615,6 +1677,7 @@ func (gbcpu *GBCPU) HALT() {
 	gbcpu.Halted = true
 }
 
+// CB executes a CB-prefixed instruction
 func (gbcpu *GBCPU) CB() int {
 	operand := gbcpu.getOperands(1)[0]
 	gbcpu.InstrsCB[operand].Executor()
@@ -1633,10 +1696,4 @@ func (gbcpu *GBCPU) getOperands(number uint16) []byte {
 	copy(operands, GbMMU.Memory[begin:end])
 
 	return operands
-}
-
-func (gbcpu *GBCPU) getValCartAddr(a1, a2 *byte, number uint16) []byte {
-	begin := binary.LittleEndian.Uint16([]byte{*a2, *a1})
-	end := begin + (number - 1)
-	return GbMMU.Memory[begin:end]
 }

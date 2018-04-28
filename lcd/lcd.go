@@ -1,3 +1,4 @@
+// Package lcd models all functionality related to the Game Boy's video output
 package lcd
 
 import (
@@ -133,13 +134,13 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 
 				if interrupt&1 != 0 {
 					// Run interrupt handler
-					GbCPU.RST40()
+					GbCPU.RSTI(0x40)
 
 					// Clear VBlank interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 0)
 					updateCycles += 16
 				} else if interrupt&4 != 0 {
-					GbCPU.RST50()
+					GbCPU.RSTI(0x50)
 
 					// Clear timer interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 2)
@@ -161,14 +162,14 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 
 				if interrupt&1 != 0 {
 					// Run interrupt handler
-					GbCPU.RST40()
+					GbCPU.RSTI(0x40)
 
 					// Clear VBlank interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 0)
 					updateCycles += 16
 					instrTotal += 16
 				} else if interrupt&4 != 0 {
-					GbCPU.RST50()
+					GbCPU.RSTI(0x50)
 
 					// Clear timer interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 2)

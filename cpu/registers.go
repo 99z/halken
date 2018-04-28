@@ -62,28 +62,6 @@ func (regs *Registers) readPair(reg1, reg2 *byte) []byte {
 	return []byte{*reg1, *reg2}
 }
 
-func (regs *Registers) incrementHL(amt uint8) {
-	newL := regs.l + amt
-
-	if newL == 0 {
-		regs.l = 0
-		regs.h++
-	} else {
-		regs.l = newL
-	}
-}
-
-func (regs *Registers) incrementPair(reg1, reg2 *byte, amt uint8) {
-	newL := *reg2 + amt
-
-	if newL == 0 {
-		*reg2 = 0
-		*reg1++
-	} else {
-		*reg2 = newL
-	}
-}
-
 func (regs *Registers) SplitWord(rr uint16) (byte, byte) {
 	return byte(rr >> 8), byte(rr)
 }
@@ -93,9 +71,9 @@ func (regs *Registers) JoinRegs(reg1, reg2 *byte) uint16 {
 
 	// Handle OOB
 	// TODO Probably a potential issue elsewhere, change mem model to fix
-	if result >= 0xFFFF {
-		result--
-	}
+	// if result >= 0xFFFF {
+	// 	result--
+	// }
 
 	return result
 }
