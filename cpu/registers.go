@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Registers represents LR35902 register
+// Registers represents Sharp LR35902 register
 // Notes:
 // Carry flag - https://stackoverflow.com/questions/31409444/what-is-the-behavior-of-the-carry-flag-for-cp-on-a-game-boy
 // Half carry flag - http://stackoverflow.com/questions/8868396/gbz80-what-constitutes-a-half-carry/8874607#8874607
@@ -27,12 +27,11 @@ type Registers struct {
 	l byte
 
 	sp []byte // Stack pointer
-	// Program counter
-	// I THINK this will just refer to an index of the ROM as a byte array
-	PC []byte
+	PC []byte // Program counter
 }
 
-// GB register initial values
+// InitRegs sets post-bootrom register values
+// GB register initial values:
 // http://bgb.bircd.org/pandocs.htm#powerupsequence
 func (regs *Registers) InitRegs() {
 	regs.writePair(&regs.a, &regs.f, []byte{0xB0, 0x01})
@@ -161,6 +160,7 @@ func (regs *Registers) getCarry() byte {
 	return 0
 }
 
+// Dump prints register values for debugging
 func (regs *Registers) Dump() {
 	fmt.Printf("AF: %02X %02X\n", regs.a, regs.f)
 	fmt.Printf("BC: %02X %02X\n", regs.b, regs.c)

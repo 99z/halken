@@ -203,6 +203,8 @@ func lcdEnabled() byte {
 	return GbMMU.Memory[LCDC] & (1 << 7)
 }
 
+// TODO Not "creating" a background is nice, but might be needed for vertical
+// scroll effect to work correctly
 func (gblcd *GBLCD) renderWindow() {
 	useAltbgmap := GbMMU.Memory[LCDC]&(1<<3) != 0
 	bgmap := GbMMU.Memory[0x9800:0x9C00]
@@ -233,11 +235,15 @@ func (gblcd *GBLCD) renderWindow() {
 			xVal += 8
 			xOff = int(xVal) * 8
 
+			// Calculate new offset
 			offset = (yOff + xOff) / 64
 		}
 
+		// Move to next row
 		yVal += 8
 		yOff = int(yVal) * 256
+
+		// Set X to the X value of the top left corner
 		xVal = initialX
 		xOff = int(xVal) * 8
 		offset = (yOff + xOff) / 64
@@ -253,7 +259,6 @@ func (gblcd *GBLCD) renderWindow() {
 		}
 	}
 
-	// fmt.Println(sprites[6].Y)
 	for _, sprite := range sprites {
 		for _, px := range sprite.Tile {
 			window.Set(px.Point.X+sprite.X, px.Point.Y+sprite.Y, px.Color)

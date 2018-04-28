@@ -41,6 +41,8 @@ func (gbcpu *GBCPU) loadInstructions() {
 		0x0F: Instruction{"RRCA", 4, 1, func() int { gbcpu.RRCA(); return 0 }},
 		// STOP hardware bug
 		// https://stackoverflow.com/questions/41353869/length-of-instruction-ld-a-c-in-gameboy-z80-processor
+		// The STOP command halts the GameBoy processor and screen until any button is pressed. The GB
+		// and GBP screen goes white with a single dark horizontal line. The GBC screen goes black.
 		0x10: Instruction{"STOP", 4, 1, func() int { return 0 }},
 		0x11: Instruction{"LD DE,i16", 12, 3, func() int { gbcpu.LDrrnn(&gbcpu.Regs.d, &gbcpu.Regs.e); return 0 }},
 		0x12: Instruction{"LD (DE),A", 8, 1, func() int { gbcpu.LDaar(&gbcpu.Regs.d, &gbcpu.Regs.e, &gbcpu.Regs.a); return 0 }},
