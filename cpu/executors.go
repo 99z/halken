@@ -137,7 +137,7 @@ func (gbcpu *GBCPU) INCHL() {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	GbMMU.WriteByte(addr, result)
+	GbMMU.WriteData(addr, result)
 
 	if GbMMU.Memory[addr] == 0 {
 		gbcpu.Regs.setZero()
@@ -161,7 +161,7 @@ func (gbcpu *GBCPU) DECHL() {
 		gbcpu.Regs.clearHalfCarry()
 	}
 
-	GbMMU.WriteByte(addr, result)
+	GbMMU.WriteData(addr, result)
 
 	if GbMMU.Memory[addr] == 0 {
 		gbcpu.Regs.setZero()
@@ -356,8 +356,8 @@ func (gbcpu *GBCPU) RSTI(addr byte) {
 func (gbcpu *GBCPU) LDaaSP() {
 	operands := gbcpu.getOperands(2)
 	addrInc := binary.LittleEndian.Uint16(operands) + 1
-	GbMMU.WriteByte(gbcpu.sliceToInt(operands), gbcpu.Regs.sp[0])
-	GbMMU.WriteByte(addrInc, gbcpu.Regs.sp[1])
+	GbMMU.WriteData(gbcpu.sliceToInt(operands), gbcpu.Regs.sp[0])
+	GbMMU.WriteData(addrInc, gbcpu.Regs.sp[1])
 }
 
 // LDSPnn -> e.g. LD SP,i16
@@ -1194,14 +1194,14 @@ func (gbcpu *GBCPU) POPrr(reg1, reg2 *byte) {
 // Loads value at addr (a1a2) into reg
 // Flags: none
 func (gbcpu *GBCPU) LDraa(reg, a1, a2 *byte) {
-	*reg = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(a1, a2))
+	*reg = GbMMU.ReadData(gbcpu.Regs.JoinRegs(a1, a2))
 }
 
 // LDaar -> e.g. LD (BC),A
 // Loads reg into value at addr (a1a2)
 // Flags: none
 func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
-	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(a1, a2), *reg)
+	GbMMU.WriteData(gbcpu.Regs.JoinRegs(a1, a2), *reg)
 }
 
 // LDaaA -> e.g. LD (a16),A
@@ -1210,7 +1210,7 @@ func (gbcpu *GBCPU) LDaar(a1, a2, reg *byte) {
 func (gbcpu *GBCPU) LDaaA(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	operandsInt := gbcpu.sliceToInt(operands)
-	GbMMU.WriteByte(operandsInt, *reg)
+	GbMMU.WriteData(operandsInt, *reg)
 }
 
 // LDAaa -> e.g. LD A,(a16)
@@ -1219,40 +1219,40 @@ func (gbcpu *GBCPU) LDaaA(reg *byte) {
 func (gbcpu *GBCPU) LDAaa(reg *byte) {
 	operands := gbcpu.getOperands(2)
 	addr := gbcpu.sliceToInt(operands)
-	*reg = GbMMU.ReadByte(addr)
+	*reg = GbMMU.ReadData(addr)
 }
 
 // LDffCA -> e.g. LD ($FF00+C),A
 // Sets value at addr (0xFF00+C) to A
 func (gbcpu *GBCPU) LDffCA() {
-	GbMMU.WriteByte(0xFF00+uint16(gbcpu.Regs.c), gbcpu.Regs.a)
+	GbMMU.WriteData(0xFF00+uint16(gbcpu.Regs.c), gbcpu.Regs.a)
 }
 
 // LDAffC -> e.g. LD A,($FF00+C)
 // Sets A to value at addr (0xFF00+C)
 func (gbcpu *GBCPU) LDAffC() {
-	gbcpu.Regs.a = GbMMU.ReadByte(0xFF00 + uint16(gbcpu.Regs.c))
+	gbcpu.Regs.a = GbMMU.ReadData(0xFF00 + uint16(gbcpu.Regs.c))
 }
 
 // LDffnA -> e.g. LD ($FF00+a8),A
 // Loads A into value at addr ($FF00+a8)
 func (gbcpu *GBCPU) LDffnA() {
 	operand := gbcpu.getOperands(1)[0]
-	GbMMU.WriteByte(0xFF00+uint16(operand), gbcpu.Regs.a)
+	GbMMU.WriteData(0xFF00+uint16(operand), gbcpu.Regs.a)
 }
 
 // LDAffn -> e.g. LD A,($FF00+a8)
 // Loads value at addr ($FF00+a8) into A
 func (gbcpu *GBCPU) LDAffn() {
 	operand := gbcpu.getOperands(1)[0]
-	gbcpu.Regs.a = GbMMU.ReadByte(0xFF00 + uint16(operand))
+	gbcpu.Regs.a = GbMMU.ReadData(0xFF00 + uint16(operand))
 }
 
 // LDHLn -> e.g. LD (HL),i8
 // Loads 8 bit immediate into addr (HL)
 func (gbcpu *GBCPU) LDHLn() {
 	operand := gbcpu.getOperands(1)[0]
-	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l), operand)
+	GbMMU.WriteData(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l), operand)
 }
 
 // LDDrHL -> e.g. LDD A,(HL)
@@ -1269,7 +1269,7 @@ func (gbcpu *GBCPU) LDDrHL(reg *byte) {
 // Decrement HL
 func (gbcpu *GBCPU) LDDHLr(reg *byte) {
 	addr := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
-	GbMMU.WriteByte(addr, *reg)
+	GbMMU.WriteData(addr, *reg)
 	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(addr - 1)
 }
 
@@ -1277,7 +1277,7 @@ func (gbcpu *GBCPU) LDDHLr(reg *byte) {
 // Set value at address a1a2 to value in reg
 // Increment reg
 func (gbcpu *GBCPU) LDIHLA() {
-	GbMMU.WriteByte(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l), gbcpu.Regs.a)
+	GbMMU.WriteData(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l), gbcpu.Regs.a)
 	hl := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
 	hl++
 	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(hl)
@@ -1287,7 +1287,7 @@ func (gbcpu *GBCPU) LDIHLA() {
 // Set value in reg to value at address a1a2
 // Increment HL
 func (gbcpu *GBCPU) LDIAHL() {
-	gbcpu.Regs.a = GbMMU.ReadByte(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l))
+	gbcpu.Regs.a = GbMMU.ReadData(gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l))
 	hl := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
 	hl++
 	gbcpu.Regs.h, gbcpu.Regs.l = gbcpu.Regs.SplitWord(hl)
@@ -1672,7 +1672,7 @@ func (gbcpu *GBCPU) DI() {
 // HALT stops the CPU until an interrupt occurs
 func (gbcpu *GBCPU) HALT() {
 	// Save interrupt flag
-	gbcpu.IFPreHalt = GbMMU.ReadByte(0xFF0F)
+	gbcpu.IFPreHalt = GbMMU.ReadData(0xFF0F)
 
 	// Halt CPU
 	gbcpu.Halted = true

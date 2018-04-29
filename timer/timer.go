@@ -51,7 +51,6 @@ func (gbtimer *GBTimer) Increment(cycles int) {
 func (gbtimer *GBTimer) checkStep() {
 	selectedClock := 0
 	if GbMMU.Memory[0xFF07]&4 != 0 {
-		// fmt.Println(GbMMU.Memory[0xFF07])
 		switch GbMMU.Memory[0xFF07] & 3 {
 		case 0:
 			selectedClock = 64

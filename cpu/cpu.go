@@ -52,11 +52,11 @@ func (gbcpu *GBCPU) GetFlags() byte {
 
 func (gbcpu *GBCPU) pushByteToStack(data byte) {
 	gbcpu.Regs.decrementSP(1)
-	GbMMU.WriteByte(gbcpu.sliceToInt(gbcpu.Regs.sp), data)
+	GbMMU.WriteData(gbcpu.sliceToInt(gbcpu.Regs.sp), data)
 }
 
 func (gbcpu *GBCPU) popByteFromStack() byte {
-	result := GbMMU.ReadByte(gbcpu.sliceToInt(gbcpu.Regs.sp))
+	result := GbMMU.ReadData(gbcpu.sliceToInt(gbcpu.Regs.sp))
 	gbcpu.Regs.incrementSP(1)
 	return result
 }

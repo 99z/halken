@@ -1,3 +1,9 @@
+// Package mmu contains the GBMMU struct which represents the Game Boy's memory
+// and contains methods related to modifying memory
+// TODO The WriteData and ReadData methods are pretty lean because I am
+// modeling memory as a flat array of bytes. Need to double-check the special
+// case read/writes, and determine if I/O should alter memory directly,
+// since it is sort of an outlier in that it maintains an internal model
 package mmu
 
 import (
@@ -7,35 +13,22 @@ import (
 	"../io"
 )
 
+// GBMMU represents the Game Boy's memory
 // Reference http://gameboy.mongenel.com/dmg/asmmemmap.html
 type GBMMU struct {
 	// Array of bytes for contiguous memory access
 	Memory [0xFFFF]byte
-	areas  map[string][]uint16
 }
 
+// GbIO variable injection from main.go
+// Gives us access to instantiated IO struct's methods
 var GbIO *io.GBIO
 
-// Initial register values
+// InitMMU sets initial memory values
+// These are actually populated by the Game Boy's bootstrap ROM
 // Reference: http://bgb.bircd.org/pandocs.htm#powerupsequence
+// TODO load/execute bootstrap ROM instead?
 func (gbmmu *GBMMU) InitMMU() {
-	gbmmu.areas = make(map[string][]uint16)
-	gbmmu.areas["vectors"] = []uint16{0x0000, 0x00FF}
-	gbmmu.areas["cartHeader"] = []uint16{0x0100, 0x014F}
-	gbmmu.areas["cartBankFixed"] = []uint16{0x0150, 0x3FFF}
-	gbmmu.areas["cartBankSwitchable"] = []uint16{0x4000, 0x7FFF}
-	gbmmu.areas["characterRAM"] = []uint16{0x8000, 0x97FF}
-	gbmmu.areas["bgMapData1"] = []uint16{0x9800, 0x9BFF}
-	gbmmu.areas["bgMapData2"] = []uint16{0x9C00, 0x9FFF}
-	gbmmu.areas["cartRAM"] = []uint16{0xA000, 0xBFFF}
-	gbmmu.areas["workRAM"] = []uint16{0xC000, 0xDFFF}
-	gbmmu.areas["echoRAM"] = []uint16{0xE000, 0xFDFF}
-	gbmmu.areas["OAM"] = []uint16{0xFE00, 0xFE9F}
-	gbmmu.areas["unused"] = []uint16{0xFEA0, 0xFEFF}
-	gbmmu.areas["hardwareIO"] = []uint16{0xFF00, 0xFF7F}
-	gbmmu.areas["zeroPage"] = []uint16{0xFF80, 0xFFFE}
-	gbmmu.areas["interruptFlag"] = []uint16{0xFFFF}
-
 	// I/O register initial values after boot ROM
 	// TODO Might want to just execute boot ROM instead, since
 	// documentation online is sketchy about these
@@ -64,7 +57,12 @@ func (gbmmu *GBMMU) InitMMU() {
 	gbmmu.Memory[0xFF49] = 0xFF
 }
 
-func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
+// WriteData handles writing values to memory addresses
+// We do this instead of directly setting the value at an index because
+// some addresses are handled differently than others
+// For example, when a ROM writes to 0xFF00, it is really telling our IO
+// handler to select either buttons or dpad
+func (gbmmu *GBMMU) WriteData(addr uint16, data byte) {
 	if addr == 0xFFFF {
 		// Enable interrupts
 		gbmmu.Memory[0xFFFE] = data
@@ -73,7 +71,9 @@ func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
 	} else if addr == 0xFF0F {
 		// gbmmu.Memory[0xFF0F] |= (1 << 0)
 	} else if addr == 0xFF41 {
-		return
+		// Nothing
+	} else if addr >= 0x0000 && addr <= 0x150 {
+		// Don't allow writes to invalid locations
 	} else if addr == 0xFF46 {
 		spriteAddr := int(data) * 256
 		for i := range gbmmu.Memory[0xFE00:0xFEA0] {
@@ -86,7 +86,12 @@ func (gbmmu *GBMMU) WriteByte(addr uint16, data byte) {
 	}
 }
 
-func (gbmmu *GBMMU) ReadByte(addr uint16) byte {
+// ReadData handles reading values from memory addresses
+// Like WriteData, this is necessary because we may want to specify different
+// things to return
+// Again, for example, reading 0xFF00 should return the last input, which is
+// not stored in any memory directly in my implementation
+func (gbmmu *GBMMU) ReadData(addr uint16) byte {
 	if addr == 0xFFFF {
 		return gbmmu.Memory[0xFFFE]
 	} else if addr == 0xFF00 {
@@ -94,10 +99,9 @@ func (gbmmu *GBMMU) ReadByte(addr uint16) byte {
 	} else {
 		return gbmmu.Memory[addr]
 	}
-	return 0
 }
 
-// Reads cartridge ROM into Memory
+// LoadCart reads cartridge ROM into memory
 // Returns ROM as byte slice
 func (gbmmu *GBMMU) LoadCart(path string) error {
 	cartData, err := ioutil.ReadFile(path)

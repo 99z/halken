@@ -151,7 +151,7 @@ func (gblcd *GBLCD) Update(screen *ebiten.Image) {
 			GbTimer.Increment(updateCycles)
 		} else {
 			instrTotal := 0
-			currentIF := GbMMU.ReadByte(0xFF0F)
+			currentIF := GbMMU.ReadData(0xFF0F)
 
 			if currentIF != GbCPU.IFPreHalt {
 				GbCPU.Halted = false
@@ -415,6 +415,11 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	if GbMMU.Memory[LY] == GbMMU.Memory[LYC] {
 		// Set coincidence bit
 		GbMMU.Memory[STAT] |= (1 << 2)
+
+		// LCD STAT interrupt
+		if GbMMU.Memory[0xFFFE]&(1<<1) != 0 {
+			GbMMU.Memory[0xFF0F] |= (1 << 1)
+		}
 	} else {
 		// Clear coincidence bit
 		GbMMU.Memory[STAT] &^= (1 << 2)
