@@ -25,7 +25,8 @@ func (gbcpu *GBCPU) LDrr(to, from *byte) {
 // Loads 2 8-bit immediate operands into register pair
 func (gbcpu *GBCPU) LDrrnn(reg1, reg2 *byte) {
 	operands := gbcpu.getOperands(2)
-	gbcpu.Regs.writePair(reg1, reg2, operands)
+	*reg1 = operands[1]
+	*reg2 = operands[0]
 }
 
 // LDSPHL -> e.g. LD SP,HL
