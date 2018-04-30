@@ -2,7 +2,6 @@
 package lcd
 
 import (
-	"encoding/binary"
 	"image"
 	"image/color"
 	"time"
@@ -21,7 +20,7 @@ type GBLCD struct {
 	tileset     [2]byte
 	modeClock   int16
 	currentLine uint16
-	window      *image.RGBA
+	Window      *image.RGBA
 	currentBG   *image.RGBA
 }
 
@@ -49,7 +48,6 @@ func (gblcd *GBLCD) InitLCD() {
 	gblcd.mode = 2
 }
 
-const maxCycles = 69905
 const tileBytes = 16
 
 var (
@@ -62,130 +60,7 @@ var (
 	second = time.Tick(time.Second)
 )
 
-// Set offsets to uint8s, just add and let it overflow
-// Linear offset in bg map of first tile in window
-// ((y offset * num pixels per row) + (x offset * 8)) / 8
-func (gblcd *GBLCD) Run(screen *ebiten.Image) error {
-	// Logical update
-	GbIO.ReadInput()
-	gblcd.Update(screen)
-
-	gblcd.renderWindow()
-
-	ebitenBG, _ := ebiten.NewImageFromImage(gblcd.window, ebiten.FilterDefault)
-	opts := &ebiten.DrawImageOptions{}
-	screen.DrawImage(ebitenBG, opts)
-
-	// Graphics update
-
-	return nil
-}
-
-func (gblcd *GBLCD) Update(screen *ebiten.Image) {
-	// Main loop
-	// 1. Execute next operation
-	// 2. Update total cycles
-	// 3. Update timers
-	// 4. Update LCD
-	// 5. Perform interrupts
-	updateCycles := 0
-
-	// 4194304 is max cycles that can be executed per second
-	// Since running at 60 FPS, each cycle max must be 4194304/60 = 69905
-	for updateCycles < maxCycles {
-		if !GbCPU.Halted {
-			if GbCPU.EIReceived {
-				GbCPU.IME = 1
-			}
-			GbCPU.Jumped = false
-			opcode := GbCPU.Regs.PC[:]
-			opcodeInt := binary.LittleEndian.Uint16(opcode)
-
-			operation := GbMMU.Memory[opcodeInt]
-
-			// fmt.Printf("%02X:%02X\t%02X\t%v\n", opcode[1], opcode[0], operation, GbCPU.Instrs[operation])
-			// fmt.Printf("CTRL: %02X, STAT: %02X\n", GbMMU.Memory[0xFF40], GbMMU.Memory[0xFF41])
-			// fmt.Printf("IE: %02X, IF: %02X, LY: %02X\n", GbMMU.Memory[0xFFFE], GbMMU.Memory[0xFF0F], GbMMU.Memory[0xFF44])
-			// fmt.Println(GbMMU.Memory[0xFF0F])
-
-			delay := GbCPU.Instrs[operation].Executor()
-
-			// Update cycles
-			updateCycles += int(GbCPU.Instrs[operation].TCycles) + delay
-
-			// Update graphics
-			gblcd.updateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
-
-			GbTimer.Increment(updateCycles)
-
-			if GbCPU.Jumped {
-				continue
-			} else {
-				nextInstr := binary.LittleEndian.Uint16(GbCPU.Regs.PC) + GbCPU.Instrs[operation].NumOperands
-				// Interesting problem if we don't make a new byte array here
-				// TODO Explain exactly what it is... when I understand it
-				nextInstrAdddr := make([]byte, 2)
-				binary.LittleEndian.PutUint16(nextInstrAdddr, nextInstr)
-				GbCPU.Regs.PC = nextInstrAdddr
-			}
-
-			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
-				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
-
-				if interrupt&1 != 0 {
-					// Run interrupt handler
-					GbCPU.RSTI(0x40)
-
-					// Clear VBlank interrupt request bit
-					GbMMU.Memory[0xFF0F] &^= (1 << 0)
-					updateCycles += 16
-				} else if interrupt&4 != 0 {
-					GbCPU.RSTI(0x50)
-
-					// Clear timer interrupt request bit
-					GbMMU.Memory[0xFF0F] &^= (1 << 2)
-					updateCycles += 16
-				}
-			}
-
-			GbTimer.Increment(updateCycles)
-		} else {
-			instrTotal := 0
-			currentIF := GbMMU.ReadData(0xFF0F)
-
-			if currentIF != GbCPU.IFPreHalt {
-				GbCPU.Halted = false
-			}
-
-			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
-				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
-
-				if interrupt&1 != 0 {
-					// Run interrupt handler
-					GbCPU.RSTI(0x40)
-
-					// Clear VBlank interrupt request bit
-					GbMMU.Memory[0xFF0F] &^= (1 << 0)
-					updateCycles += 16
-					instrTotal += 16
-				} else if interrupt&4 != 0 {
-					GbCPU.RSTI(0x50)
-
-					// Clear timer interrupt request bit
-					GbMMU.Memory[0xFF0F] &^= (1 << 2)
-					instrTotal += 16
-					updateCycles += 16
-				}
-			}
-
-			updateCycles++
-			GbTimer.Increment(updateCycles)
-			gblcd.updateGraphics(1+instrTotal, screen)
-		}
-	}
-}
-
-func (gblcd *GBLCD) updateGraphics(cycles int, screen *ebiten.Image) {
+func (gblcd *GBLCD) UpdateGraphics(cycles int, screen *ebiten.Image) {
 	if lcdEnabled() == 0 {
 		gblcd.modeClock = 0
 		gblcd.currentLine = 0
@@ -205,7 +80,7 @@ func lcdEnabled() byte {
 
 // TODO Not "creating" a background is nice, but might be needed for vertical
 // scroll effect to work correctly
-func (gblcd *GBLCD) renderWindow() {
+func (gblcd *GBLCD) RenderWindow() {
 	useAltbgmap := GbMMU.Memory[LCDC]&(1<<3) != 0
 	bgmap := GbMMU.Memory[0x9800:0x9C00]
 
@@ -265,7 +140,7 @@ func (gblcd *GBLCD) renderWindow() {
 		}
 	}
 
-	gblcd.window = window
+	gblcd.Window = window
 }
 
 func (gblcd *GBLCD) renderSprites() []*Sprite {
