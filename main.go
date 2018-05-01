@@ -143,7 +143,7 @@ func update(screen *ebiten.Image) {
 			// total number of cycles in this frame
 			// We only want to pass the number of cycles taken by the previous
 			// instruction
-			GbLCD.UpdateGraphics(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
+			GbLCD.UpdateLCD(int(GbCPU.Instrs[operation].TCycles)+delay, screen)
 
 			// Increment the timer
 			// See timer/timer.go for details
@@ -227,7 +227,7 @@ func update(screen *ebiten.Image) {
 			// Halted CPU still takes 1 cycle by default
 			updateCycles++
 			GbTimer.Increment(updateCycles)
-			GbLCD.UpdateGraphics(1+instrTotal, screen)
+			GbLCD.UpdateLCD(1+instrTotal, screen)
 		}
 	}
 }
