@@ -144,8 +144,23 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 	var yVal byte = GbMMU.Memory[scy]
 	var xVal byte = GbMMU.Memory[scx]
 
-	bounds := image.Rect(int(xVal), int(yVal), int(xVal)+160, int(yVal)+144)
-	window := bgImage.SubImage(bounds)
+	initialX := GbMMU.Memory[scx]
+
+	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
+
+	for height := 0; height < 144; height++ {
+		for width := 0; width < 160; width++ {
+			offset := bgImage.PixOffset(int(xVal), int(yVal))
+			pix := bgImage.Pix[offset : offset+4]
+			color := color.RGBA{pix[0], pix[1], pix[2], pix[3]}
+			window.SetRGBA(width, height, color)
+
+			xVal++
+		}
+
+		yVal++
+		xVal = initialX
+	}
 
 	// Update Window value with new frame data
 	gblcd.Window = window

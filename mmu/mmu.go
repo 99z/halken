@@ -17,7 +17,7 @@ import (
 // Reference http://gameboy.mongenel.com/dmg/asmmemmap.html
 type GBMMU struct {
 	// Array of bytes for contiguous memory access
-	Memory [0xFFFF]byte
+	Memory [65536]byte
 }
 
 // GbIO variable injection from main.go
