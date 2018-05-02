@@ -94,6 +94,48 @@ func (gblcd *GBLCD) UpdateLCD(cycles int, screen *ebiten.Image) {
 	}
 }
 
+func (gblcd *GBLCD) DebugDrawBG() {
+	// If the third bit of LCDC is 1, this indicated we should use the second
+	// background map, located elsewhere in memory
+	useAltbgmap := GbMMU.Memory[lcdc]&(1<<3) != 0
+
+	// By default, use the background map located at 0x9800 - 0x9C00
+	bgmap := GbMMU.Memory[0x9800:0x9C00]
+
+	if useAltbgmap {
+		// Change background map location if bit above was set
+		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
+	}
+
+	populated := gblcd.populateBackgroundTiles(bgmap)
+	gblcd.generateBackgroundImage(populated)
+}
+
+func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
+	var filledBackground [][]*Pixel
+
+	for _, tileID := range bgmap {
+		tile := gblcd.renderTile(int(tileID), false)
+		filledBackground = append(filledBackground, tile)
+	}
+
+	return filledBackground
+}
+
+func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) {
+	background := image.NewRGBA(image.Rect(0, 0, 256, 256))
+
+	for i, tile := range bgTiles {
+		for _, px := range tile {
+			tileX := ((i % 32) * 8)
+			tileY := ((i / 32) * 8)
+			background.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
+		}
+	}
+
+	gblcd.Window = background
+}
+
 // RenderWindow sets the window field on GBLCD to an image of the current frame
 // This approach avoids needing to draw the entire background and then a window
 // on top of it. Instead, we are rendering only what should be displayed in

@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// Kick off main emulation loop & create graphics context
-	ebiten.Run(run, 160, 144, 4, "Halken")
+	ebiten.Run(run, 256, 256, 2, "Halken")
 }
 
 // run is the primary emulation loop, called 60 times per second by ebiten
@@ -82,7 +82,8 @@ func run(screen *ebiten.Image) error {
 	update(screen)
 
 	// Update window, which is just an image
-	GbLCD.RenderWindow()
+	// GbLCD.RenderWindow()
+	GbLCD.DebugDrawBG()
 
 	// Draw the window to the graphics context
 	ebitenBG, _ := ebiten.NewImageFromImage(GbLCD.Window, ebiten.FilterDefault)
