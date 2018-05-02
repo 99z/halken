@@ -156,6 +156,11 @@ func (gblcd *GBLCD) RenderWindow() {
 
 		// Move to next row
 		yVal += 8
+
+		// if yVal > 248 {
+		// 	yVal = 0
+		// }
+
 		yOff = int(yVal) * 256
 
 		// Set X to the X value of the top left corner

@@ -300,5 +300,10 @@ func (gbcpu *GBCPU) SETnr(pos uint8, reg *byte) {
 // Set bit in value at addr (HL)
 // Flags: ----
 func (gbcpu *GBCPU) SETHL(pos uint8) {
+	// addr := gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)
+
+	// if addr == 0xFFFF {
+	// 	addr--
+	// }
 	gbcpu.SETnr(pos, &GbMMU.Memory[gbcpu.Regs.JoinRegs(&gbcpu.Regs.h, &gbcpu.Regs.l)])
 }

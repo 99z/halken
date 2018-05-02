@@ -207,18 +207,43 @@ func update(screen *ebiten.Image) {
 				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
 
 				if interrupt&1 != 0 {
-					// Run interrupt handler
+					// Run VBlank interrupt handler
 					GbCPU.RSTI(0x40)
 
 					// Clear VBlank interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 0)
 					updateCycles += 16
 					instrTotal += 16
+				} else if interrupt&2 != 0 {
+					// Run LCD STAT interrupt handler
+					GbCPU.RSTI(0x48)
+
+					// Clear LCD STAT interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 1)
+					instrTotal += 16
+					updateCycles += 16
 				} else if interrupt&4 != 0 {
+					// Run timer overflow interrupt handler
 					GbCPU.RSTI(0x50)
 
-					// Clear timer interrupt request bit
+					// Clear timer overflow interrupt request bit
 					GbMMU.Memory[0xFF0F] &^= (1 << 2)
+					instrTotal += 16
+					updateCycles += 16
+				} else if interrupt&8 != 0 {
+					// Run serial link interrupt handler
+					GbCPU.RSTI(0x58)
+
+					// Clear serial link interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 3)
+					instrTotal += 16
+					updateCycles += 16
+				} else if interrupt&16 != 0 {
+					// Run joypad interrupt handler
+					GbCPU.RSTI(0x60)
+
+					// Clear joypad interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 4)
 					instrTotal += 16
 					updateCycles += 16
 				}
