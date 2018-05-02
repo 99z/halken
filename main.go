@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// Kick off main emulation loop & create graphics context
-	ebiten.Run(run, 256, 256, 2, "Halken")
+	ebiten.Run(run, 160, 144, 4, "Halken")
 }
 
 // run is the primary emulation loop, called 60 times per second by ebiten

@@ -21,7 +21,7 @@ type GBLCD struct {
 	mode        uint8
 	modeClock   int16
 	currentLine uint16
-	Window      *image.RGBA
+	Window      image.Image
 }
 
 // Pixel holds color & x, y point
@@ -108,7 +108,8 @@ func (gblcd *GBLCD) DebugDrawBG() {
 	}
 
 	populated := gblcd.populateBackgroundTiles(bgmap)
-	gblcd.generateBackgroundImage(populated)
+	bgImage := gblcd.generateBackgroundImage(populated)
+	gblcd.placeWindow(bgImage)
 }
 
 func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
@@ -122,7 +123,7 @@ func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
 	return filledBackground
 }
 
-func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) {
+func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) *image.RGBA {
 	background := image.NewRGBA(image.Rect(0, 0, 256, 256))
 
 	for i, tile := range bgTiles {
@@ -133,7 +134,21 @@ func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) {
 		}
 	}
 
-	gblcd.Window = background
+	return background
+}
+
+func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
+	// SCX and SCY specify the upper-left location on the 256x256 background map
+	// which is displayed on the upper-left corner of the LCD
+	// Basically, it is the window's offset into the background map
+	var yVal byte = GbMMU.Memory[scy]
+	var xVal byte = GbMMU.Memory[scx]
+
+	bounds := image.Rect(int(xVal), int(yVal), int(xVal)+160, int(yVal)+144)
+	window := bgImage.SubImage(bounds)
+
+	// Update Window value with new frame data
+	gblcd.Window = window
 }
 
 // RenderWindow sets the window field on GBLCD to an image of the current frame
