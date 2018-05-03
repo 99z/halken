@@ -118,6 +118,15 @@ func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
 	for _, tileID := range bgmap {
 		tile := gblcd.renderTile(int(tileID), false)
 		filledBackground = append(filledBackground, tile)
+
+		useAltbgmap := GbMMU.Memory[lcdc]&(1<<3) != 0
+
+		if useAltbgmap {
+			// Change background map location if bit above was set
+			bgmap = GbMMU.Memory[0x9C00:0x9FFF]
+		} else {
+			bgmap = GbMMU.Memory[0x9800:0x9C00]
+		}
 	}
 
 	return filledBackground
@@ -160,6 +169,14 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 
 		yVal++
 		xVal = initialX
+	}
+
+	sprites := gblcd.renderSprites()
+
+	for _, sprite := range sprites {
+		for _, px := range sprite.Tile {
+			window.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
+		}
 	}
 
 	// Update Window value with new frame data
