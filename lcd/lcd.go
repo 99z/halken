@@ -4,6 +4,7 @@ package lcd
 import (
 	"image"
 	"image/color"
+	"image/draw"
 
 	"../cpu"
 	"../io"
@@ -107,8 +108,9 @@ func (gblcd *GBLCD) DebugDrawBG() {
 		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
 	}
 
-	populated := gblcd.populateBackgroundTiles(bgmap)
-	bgImage := gblcd.generateBackgroundImage(populated)
+	populatedBG := gblcd.populateBackgroundTiles(bgmap)
+	bgImage := gblcd.generateBackgroundImage(populatedBG)
+
 	gblcd.placeWindow(bgImage)
 }
 
@@ -118,18 +120,26 @@ func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
 	for _, tileID := range bgmap {
 		tile := gblcd.renderTile(int(tileID), false)
 		filledBackground = append(filledBackground, tile)
-
-		useAltbgmap := GbMMU.Memory[lcdc]&(1<<3) != 0
-
-		if useAltbgmap {
-			// Change background map location if bit above was set
-			bgmap = GbMMU.Memory[0x9C00:0x9FFF]
-		} else {
-			bgmap = GbMMU.Memory[0x9800:0x9C00]
-		}
 	}
 
 	return filledBackground
+}
+
+func (gblcd *GBLCD) populateWindowTiles() [][]*Pixel {
+	var filledWindow [][]*Pixel
+	bgmap := GbMMU.Memory[0x9800:0x9C00]
+	useAltbgmap := GbMMU.Memory[lcdc]&(1<<6) != 0
+
+	if useAltbgmap {
+		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
+	}
+
+	for _, tileID := range bgmap {
+		tile := gblcd.renderTile(int(tileID), false)
+		filledWindow = append(filledWindow, tile)
+	}
+
+	return filledWindow
 }
 
 func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) *image.RGBA {
@@ -147,6 +157,8 @@ func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) *image.RGBA {
 }
 
 func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
+	windowEnabled := GbMMU.Memory[lcdc]&(1<<5) != 0
+
 	// SCX and SCY specify the upper-left location on the 256x256 background map
 	// which is displayed on the upper-left corner of the LCD
 	// Basically, it is the window's offset into the background map
@@ -177,6 +189,20 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 		for _, px := range sprite.Tile {
 			window.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
 		}
+	}
+
+	// TODO Should sprites be able to be drawn on top of window?
+	if windowEnabled {
+		populatedWindow := gblcd.populateWindowTiles()
+		windowImage := gblcd.generateBackgroundImage(populatedWindow)
+
+		winX := int(GbMMU.Memory[0xFF4B]) - 7
+		winY := int(GbMMU.Memory[0xFF4A])
+		dp := image.Point{winX, winY}
+		windowBounds := windowImage.Bounds()
+
+		r := windowBounds.Sub(windowBounds.Min).Add(dp)
+		draw.Draw(window, r, windowImage, windowBounds.Min, draw.Src)
 	}
 
 	// Update Window value with new frame data
