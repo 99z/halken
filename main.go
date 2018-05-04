@@ -82,11 +82,10 @@ func run(screen *ebiten.Image) error {
 	update(screen)
 
 	// Update window, which is just an image
-	// GbLCD.RenderWindow()
-	GbLCD.DebugDrawBG()
+	GbLCD.DrawFrame()
 
 	// Draw the window to the graphics context
-	ebitenBG, _ := ebiten.NewImageFromImage(GbLCD.Window, ebiten.FilterDefault)
+	ebitenBG, _ := ebiten.NewImageFromImage(GbLCD.View, ebiten.FilterDefault)
 	opts := &ebiten.DrawImageOptions{}
 	screen.DrawImage(ebitenBG, opts)
 

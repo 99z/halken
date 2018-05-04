@@ -22,7 +22,7 @@ type GBLCD struct {
 	mode        uint8
 	modeClock   int16
 	currentLine uint16
-	Window      image.Image
+	View        image.Image
 }
 
 // Pixel holds color & x, y point
@@ -68,12 +68,28 @@ var (
 
 // lcdEnabled returns 1 if LCD is enabled, 0 if not
 // 7th bit of LCDC register indicates if LCD is on or off
-func lcdEnabled() byte {
+func (gblcd *GBLCD) lcdEnabled() byte {
 	if GbMMU.Memory[lcdc]&(1<<7) != 0 {
 		return 1
 	}
 
 	return 0
+}
+
+// getTileMap takes a bit identifier and returns a tile map
+// The background's tile map is determined by the 3rd bit in LCDC, and the
+// window's is determined by the 6th
+func (gblcd *GBLCD) getTileMap(identifier byte) []byte {
+	// If the third bit of LCDC is 1, this indicated we should use the second
+	// background map, located elsewhere in memory
+	useAltbgmap := GbMMU.Memory[lcdc]&(1<<identifier) != 0
+
+	if useAltbgmap {
+		// Change background map location if bit above was set
+		return GbMMU.Memory[0x9C00:0x9FFF]
+	}
+
+	return GbMMU.Memory[0x9800:0x9C00]
 }
 
 // UpdateLCD updates the status of the LCD
@@ -82,7 +98,7 @@ func lcdEnabled() byte {
 // Setting these values ensures that they don't get incremented when LCD is off
 // If it is enabled, then add to modeClock and set LCD status
 func (gblcd *GBLCD) UpdateLCD(cycles int, screen *ebiten.Image) {
-	if lcdEnabled() == 0 {
+	if gblcd.lcdEnabled() == 0 {
 		gblcd.modeClock = 0
 		gblcd.currentLine = 0
 		GbMMU.Memory[ly] = 0
@@ -95,27 +111,31 @@ func (gblcd *GBLCD) UpdateLCD(cycles int, screen *ebiten.Image) {
 	}
 }
 
-func (gblcd *GBLCD) DebugDrawBG() {
-	// If the third bit of LCDC is 1, this indicated we should use the second
-	// background map, located elsewhere in memory
-	useAltbgmap := GbMMU.Memory[lcdc]&(1<<3) != 0
+// DrawFrame calls methods to construct and set the image of the current frame
+func (gblcd *GBLCD) DrawFrame() {
+	// Populate background map with Pixels, representing tiles
+	populatedBG := gblcd.populateTiles(false)
 
-	// By default, use the background map located at 0x9800 - 0x9C00
-	bgmap := GbMMU.Memory[0x9800:0x9C00]
-
-	if useAltbgmap {
-		// Change background map location if bit above was set
-		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
-	}
-
-	populatedBG := gblcd.populateBackgroundTiles(bgmap)
+	// Create image from populated background map
 	bgImage := gblcd.generateBackgroundImage(populatedBG)
 
-	gblcd.placeWindow(bgImage)
+	gblcd.placeView(bgImage)
 }
 
-func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
+// populateBackgroundTiles takes a background map and returns an array
+// of 8x8 tiles, represented as Pixels
+// The BG map is really a list of tile identifiers - doesn't contain
+// actual tile data
+// This gets us the tile data from those identifiers
+func (gblcd *GBLCD) populateTiles(window bool) [][]*Pixel {
+	var bgmap []byte
 	var filledBackground [][]*Pixel
+
+	if window {
+		bgmap = gblcd.getTileMap(6)
+	} else {
+		bgmap = gblcd.getTileMap(3)
+	}
 
 	for _, tileID := range bgmap {
 		tile := gblcd.renderTile(int(tileID), 0, false)
@@ -125,23 +145,8 @@ func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
 	return filledBackground
 }
 
-func (gblcd *GBLCD) populateWindowTiles() [][]*Pixel {
-	var filledWindow [][]*Pixel
-	bgmap := GbMMU.Memory[0x9800:0x9C00]
-	useAltbgmap := GbMMU.Memory[lcdc]&(1<<6) != 0
-
-	if useAltbgmap {
-		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
-	}
-
-	for _, tileID := range bgmap {
-		tile := gblcd.renderTile(int(tileID), 0, false)
-		filledWindow = append(filledWindow, tile)
-	}
-
-	return filledWindow
-}
-
+// generateBackgroundImage takes an array of Pixel arrays, each of which
+// represent an 8x8 tile, and returns an image
 func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) *image.RGBA {
 	background := image.NewRGBA(image.Rect(0, 0, 256, 256))
 
@@ -156,7 +161,12 @@ func (gblcd *GBLCD) generateBackgroundImage(bgTiles [][]*Pixel) *image.RGBA {
 	return background
 }
 
-func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
+// placeView takes an image of the 256x256 background and creates the
+// 160x144 view into it
+// If the game has a window, it draws the portion of that window
+// that should be visible on top of the background before creating the final
+// view image
+func (gblcd *GBLCD) placeView(bgImage *image.RGBA) {
 	windowEnabled := GbMMU.Memory[lcdc]&(1<<5) != 0
 
 	// SCX and SCY specify the upper-left location on the 256x256 background map
@@ -167,14 +177,14 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 
 	initialX := GbMMU.Memory[scx]
 
-	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
+	view := image.NewRGBA(image.Rect(0, 0, 160, 144))
 
 	for height := 0; height < 144; height++ {
 		for width := 0; width < 160; width++ {
 			offset := bgImage.PixOffset(int(xVal), int(yVal))
 			pix := bgImage.Pix[offset : offset+4]
 			color := color.RGBA{pix[0], pix[1], pix[2], pix[3]}
-			window.SetRGBA(width, height, color)
+			view.SetRGBA(width, height, color)
 
 			xVal++
 		}
@@ -184,8 +194,9 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 	}
 
 	// TODO Should sprites be able to be drawn on top of window?
+	// Also this should probably pulled out into its own method
 	if windowEnabled {
-		populatedWindow := gblcd.populateWindowTiles()
+		populatedWindow := gblcd.populateTiles(true)
 		windowImage := gblcd.generateBackgroundImage(populatedWindow)
 
 		winX := int(GbMMU.Memory[0xFF4B]) - 7
@@ -194,117 +205,19 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 		windowBounds := windowImage.Bounds()
 
 		r := windowBounds.Sub(windowBounds.Min).Add(dp)
-		draw.Draw(window, r, windowImage, windowBounds.Min, draw.Src)
+		draw.Draw(view, r, windowImage, windowBounds.Min, draw.Src)
 	}
 
 	sprites := gblcd.renderSprites()
 
 	for _, sprite := range sprites {
 		for _, px := range sprite.Tile {
-			window.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
+			view.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
 		}
 	}
 
 	// Update Window value with new frame data
-	gblcd.Window = window
-}
-
-// RenderWindow sets the window field on GBLCD to an image of the current frame
-// This approach avoids needing to draw the entire background and then a window
-// on top of it. Instead, we are rendering only what should be displayed in
-// the window every frame.
-func (gblcd *GBLCD) RenderWindow() {
-	// If the third bit of LCDC is 1, this indicated we should use the second
-	// background map, located elsewhere in memory
-	useAltbgmap := GbMMU.Memory[lcdc]&(1<<3) != 0
-
-	// By default, use the background map located at 0x9800 - 0x9C00
-	bgmap := GbMMU.Memory[0x9800:0x9C00]
-
-	if useAltbgmap {
-		// Change background map location if bit above was set
-		bgmap = GbMMU.Memory[0x9C00:0x9FFF]
-	}
-
-	// Create a blank 160x144 image representing the LCD
-	window := image.NewRGBA(image.Rect(0, 0, 160, 144))
-
-	// Create an empty 2D slice of Pixels
-	// Each element is a 64-len slice, representing one tile's pixels (8x8)
-	// Total is 18*20 tiles, 360 total for the window
-	var tiles [][]*Pixel
-
-	// SCX and SCY specify the upper-left location on the 256x256 background map
-	// which is displayed on the upper-left corner of the LCD
-	// Basically, it is the window's offset into the background map
-	var yVal byte = GbMMU.Memory[scy]
-	var xVal byte = GbMMU.Memory[scx]
-
-	// We want to keep the initial value of SCX so we can reset our X offset
-	// when we start drawing tiles on a new row
-	var initialX byte = GbMMU.Memory[scx]
-
-	// Here we calculate an offset into the background map using the initial
-	// SCY and SCX values
-	// Since the background map is a 1D array, and the window is a 1D array,
-	// we can calculate what index to begin rendering from the background map
-	// using these calculations
-	yOff := int(yVal) * 256
-	xOff := int(xVal) * 8
-	offset := (yOff + xOff) / 64
-
-	// Get tiles on background map beginning at calculated offset
-	for height := 0; height < 18; height++ {
-		for width := 0; width < 20; width++ {
-			// Pass tile ID to renderTile
-			// 64-len slice of pixels is returned, representing one tile
-			tile := gblcd.renderTile(int(bgmap[offset]), 0, false)
-			tiles = append(tiles, tile)
-
-			// Move to the next tile
-			xVal += 8
-			xOff = int(xVal) * 8
-
-			// Calculate new offset
-			offset = (yOff + xOff) / 64
-		}
-
-		// Move to next row
-		yVal += 8
-
-		// if yVal > 248 {
-		// 	yVal = 0
-		// }
-
-		yOff = int(yVal) * 256
-
-		// Set X to the X value of the top left corner
-		xVal = initialX
-		xOff = int(xVal) * 8
-		offset = (yOff + xOff) / 64
-	}
-
-	// renderSprites returns a slice of Sprites, which we can render directly
-	sprites := gblcd.renderSprites()
-
-	// Render each tile
-	for i, tile := range tiles {
-		for _, px := range tile {
-			tileX := ((i % 20) * 8)
-			tileY := ((i / 20) * 8)
-			window.Set(px.Point.X+tileX, px.Point.Y+tileY, px.Color)
-		}
-	}
-
-	// Render each sprite
-	for _, sprite := range sprites {
-		for _, px := range sprite.Tile {
-			window.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
-		}
-	}
-
-	// Update Window value with new frame data
-	gblcd.Window = window
+	gblcd.View = view
 }
 
 // renderSprites goes through the OAM and populates a slice of Sprites
