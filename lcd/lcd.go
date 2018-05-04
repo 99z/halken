@@ -47,9 +47,6 @@ const (
 	scx  = 0xFF43
 	ly   = 0xFF44
 	lyc  = 0xFF45
-
-	// # of bytes in a tile
-	tileBytes = 16
 )
 
 // InitLCD sets LCD initial values
