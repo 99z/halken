@@ -30,7 +30,7 @@ type GBCPU struct {
 // Sets Regs and Instrs fields
 // Sets program counter to location
 func (gbcpu *GBCPU) InitCPU() {
-	gbcpu.IME = 1
+	gbcpu.IME = 0
 	gbcpu.Halted = false
 	gbcpu.EIReceived = false
 	gbcpu.Regs = new(Registers)

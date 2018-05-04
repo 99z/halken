@@ -82,7 +82,8 @@ func run(screen *ebiten.Image) error {
 	update(screen)
 
 	// Update window, which is just an image
-	GbLCD.RenderWindow()
+	// GbLCD.RenderWindow()
+	GbLCD.DebugDrawBG()
 
 	// Draw the window to the graphics context
 	ebitenBG, _ := ebiten.NewImageFromImage(GbLCD.Window, ebiten.FilterDefault)
@@ -114,6 +115,30 @@ func update(screen *ebiten.Image) {
 				GbCPU.IME = 1
 			}
 
+			// If Interrupt Master Flag is set, and Interrupt Enable register is
+			// nonzero, and Interrupt Flag register is nonzero,
+			// then we execute an interrupt
+			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
+				// Get the bit of the interrupt to execute
+				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
+
+				if interrupt&1 != 0 {
+					// Run VBlank interrupt handler
+					GbCPU.RSTI(0x40)
+
+					// Clear VBlank interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 0)
+					updateCycles += 16
+				} else if interrupt&4 != 0 {
+					// Run timer interrupt handler
+					GbCPU.RSTI(0x50)
+
+					// Clear timer interrupt request bit
+					GbMMU.Memory[0xFF0F] &^= (1 << 2)
+					updateCycles += 16
+				}
+			}
+
 			// Set Jumped to false in case the last instruction was a jump
 			GbCPU.Jumped = false
 
@@ -122,6 +147,8 @@ func update(screen *ebiten.Image) {
 			opcode := GbCPU.Regs.PC[:]
 			opcodeInt := binary.LittleEndian.Uint16(opcode)
 			operation := GbMMU.Memory[opcodeInt]
+
+			// fmt.Printf("%02X:%02X\t%v\n", opcode[1], opcode[0], GbCPU.Instrs[operation].Mnemonic)
 
 			// Execute the next instruction
 			// Delay is set to the return value of the instruction's executor
@@ -162,30 +189,6 @@ func update(screen *ebiten.Image) {
 				nextInstrAdddr := make([]byte, 2)
 				binary.LittleEndian.PutUint16(nextInstrAdddr, nextInstr)
 				GbCPU.Regs.PC = nextInstrAdddr
-			}
-
-			// If Interrupt Master Flag is set, and Interrupt Enable register is
-			// nonzero, and Interrupt Flag register is nonzero,
-			// then we execute an interrupt
-			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
-				// Get the bit of the interrupt to execute
-				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
-
-				if interrupt&1 != 0 {
-					// Run VBlank interrupt handler
-					GbCPU.RSTI(0x40)
-
-					// Clear VBlank interrupt request bit
-					GbMMU.Memory[0xFF0F] &^= (1 << 0)
-					updateCycles += 16
-				} else if interrupt&4 != 0 {
-					// Run timer interrupt handler
-					GbCPU.RSTI(0x50)
-
-					// Clear timer interrupt request bit
-					GbMMU.Memory[0xFF0F] &^= (1 << 2)
-					updateCycles += 16
-				}
 			}
 
 			GbTimer.Increment(updateCycles)
