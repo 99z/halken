@@ -118,7 +118,7 @@ func (gblcd *GBLCD) populateBackgroundTiles(bgmap []byte) [][]*Pixel {
 	var filledBackground [][]*Pixel
 
 	for _, tileID := range bgmap {
-		tile := gblcd.renderTile(int(tileID), false)
+		tile := gblcd.renderTile(int(tileID), 0, false)
 		filledBackground = append(filledBackground, tile)
 	}
 
@@ -135,7 +135,7 @@ func (gblcd *GBLCD) populateWindowTiles() [][]*Pixel {
 	}
 
 	for _, tileID := range bgmap {
-		tile := gblcd.renderTile(int(tileID), false)
+		tile := gblcd.renderTile(int(tileID), 0, false)
 		filledWindow = append(filledWindow, tile)
 	}
 
@@ -183,14 +183,6 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 		xVal = initialX
 	}
 
-	sprites := gblcd.renderSprites()
-
-	for _, sprite := range sprites {
-		for _, px := range sprite.Tile {
-			window.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
-		}
-	}
-
 	// TODO Should sprites be able to be drawn on top of window?
 	if windowEnabled {
 		populatedWindow := gblcd.populateWindowTiles()
@@ -203,6 +195,14 @@ func (gblcd *GBLCD) placeWindow(bgImage *image.RGBA) {
 
 		r := windowBounds.Sub(windowBounds.Min).Add(dp)
 		draw.Draw(window, r, windowImage, windowBounds.Min, draw.Src)
+	}
+
+	sprites := gblcd.renderSprites()
+
+	for _, sprite := range sprites {
+		for _, px := range sprite.Tile {
+			window.Set(px.Point.X+sprite.Point.X, px.Point.Y+sprite.Point.Y, px.Color)
+		}
 	}
 
 	// Update Window value with new frame data
@@ -258,7 +258,7 @@ func (gblcd *GBLCD) RenderWindow() {
 		for width := 0; width < 20; width++ {
 			// Pass tile ID to renderTile
 			// 64-len slice of pixels is returned, representing one tile
-			tile := gblcd.renderTile(int(bgmap[offset]), false)
+			tile := gblcd.renderTile(int(bgmap[offset]), 0, false)
 			tiles = append(tiles, tile)
 
 			// Move to the next tile
@@ -320,7 +320,8 @@ func (gblcd *GBLCD) renderSprites() []*Sprite {
 
 		yLoc := spriteData[0] - 16
 		xLoc := spriteData[1] - 8
-		tile := gblcd.renderTile(int(spriteData[2]), true)
+		attrs := spriteData[3]
+		tile := gblcd.renderTile(int(spriteData[2]), attrs, true)
 
 		s := &Sprite{
 			Point: image.Point{int(xLoc), int(yLoc)},
@@ -337,7 +338,7 @@ func (gblcd *GBLCD) renderSprites() []*Sprite {
 // Takes a tile ID and a bool indicator of if this is a sprite or not
 // The tile ID is provided by the background map, and is used to calculate
 // the location of the tile data in memory
-func (gblcd *GBLCD) renderTile(tileID int, sprites bool) []*Pixel {
+func (gblcd *GBLCD) renderTile(tileID int, attrs byte, sprites bool) []*Pixel {
 	pixels := []*Pixel{}
 
 	// A pixel can be one of four "colors"
@@ -408,11 +409,25 @@ func (gblcd *GBLCD) renderTile(tileID int, sprites bool) []*Pixel {
 				continue
 			}
 
-			// X location of pixel is the value of our current iterator
-			pixX := pix
+			var pixX, pixY int
+			if attrs&(1<<6) != 0 && attrs&(1<<5) != 0 {
+				pixX = 8 - pix
+				pixY = 8 - line
+			} else if attrs&(1<<6) != 0 {
+				// Y flip
+				pixX = pix
+				pixY = 8 - line
+			} else if attrs&(1<<5) != 0 {
+				// X flip
+				pixX = 8 - pix
+				pixY = line
+			} else {
+				// X location of pixel is the value of our current iterator
+				pixX = pix
 
-			// Y location of pixel is value of outer loop iterator
-			pixY := line
+				// Y location of pixel is value of outer loop iterator
+				pixY = line
+			}
 
 			// Create new pixel
 			p := &Pixel{
