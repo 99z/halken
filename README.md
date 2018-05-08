@@ -21,6 +21,9 @@ I intend to have lots of comments as well as a document regarding the process. O
 3. Flipull
 4. World Bowling
 5. Minesweeper
+6. Motorcross Maniacs
+7. Hyper Lode Runner
+8. Battlecity
 
 ## Known bugs
 * LCD STAT interrupt is not always fired - example of game where it doesn't work is Volley Fire
