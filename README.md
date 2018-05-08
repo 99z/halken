@@ -12,15 +12,18 @@ The name is one used by HAL Laboratories for a time. HAL was the first company w
 
 I intend to have lots of comments as well as a document regarding the process. Once I am happy with 32KB games generally working I'll be cleaning the code and writing documentation for others who want to tackle the same project.
 
-## Working games
+## Known working games
 
-**Usage**: `go run main.go /path/to/rom`
+**Usage**: `halken /path/to/rom`
 
 1. Tetris
 2. Dr. Mario
 3. Flipull
 4. World Bowling
 5. Minesweeper
+
+## Known bugs
+* LCD STAT interrupt is not always fired - example of game where it doesn't work is Volley Fire
 
 ## TODO
 
@@ -46,10 +49,10 @@ I intend to have lots of comments as well as a document regarding the process. O
 6. ~Graphics loop~
 7. Interrupts
    * ~VBlank~
-   * LCD
-   * Timer
-   * Serial
-   * Joypad
+   * ~LCD~
+   * ~Timer~
+   * ~Serial~
+   * ~Joypad~
 8. ~Timer~
-9. Refactor (direct memory access vs. abstractions), lower LOC, comment
+9. ~Refactor (direct memory access vs. abstractions), lower LOC, comment~
 10. Document process for learners
