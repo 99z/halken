@@ -4,7 +4,7 @@
 *Satoru Iwata*
 
 <p align="center">
-  <img src="https://my.mixtape.moe/lvsswq.gif">
+  <img src="https://i.imgur.com/opqDZes.gif">
 </p>
 
 Halken is a Game Boy emulator written in Go being developed during my time at the [Recurse Center](https://recurse.com).
@@ -24,6 +24,7 @@ I intend to have lots of comments as well as a document regarding the process. O
 
 ## Known bugs
 * LCD STAT interrupt is not always fired - example of game where it doesn't work is Volley Fire
+* Sprite color palettes besides default are unimplemented
 
 ## TODO
 
