@@ -28,6 +28,7 @@ I intend to have lots of comments as well as a document regarding the process. O
 ## Known bugs
 * LCD STAT interrupt is not always fired - example of game where it doesn't work is Volley Fire
 * Sprite color palettes besides default are unimplemented
+* Some sprites that use flipping(?) aren't drawn. Example can be seen in Battlecity where only half of tanks are drawn. Unsure why this is, probably related to how I handle "transparent" sprites
 
 ## TODO
 
