@@ -26,9 +26,10 @@ I intend to have lots of comments as well as a document regarding the process. O
 8. Battlecity
 
 ## Known bugs
-* LCD STAT interrupt is not always fired - example of game where it doesn't work is Volley Fire
+* LCD STAT interrupt is only partially correct - need to make sure all cases are covered
+  * Breaks certain games like Game of Harmony, which gets weird graphics due to it not firing when it should
 * Sprite color palettes besides default are unimplemented
-* Some sprites that use flipping(?) aren't drawn. Example can be seen in Battlecity where only half of tanks are drawn. Unsure why this is, probably related to how I handle "transparent" sprites
+* 8x16 sprites aren't drawn properly, get cut off
 
 ## TODO
 

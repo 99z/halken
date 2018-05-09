@@ -9,9 +9,7 @@ type Instruction struct {
 	Mnemonic string
 	// Number of T cycles instruction takes to execute
 	// Divide by 4 to get number of M cycles
-	TCycles uint16
-	// Currently this isn't actually used - can't think of a way to reference
-	// this value by the time we are inside of an executor function
+	TCycles     uint16
 	NumOperands uint16
 	Executor    func() int // Executes appropriate function
 }

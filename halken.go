@@ -117,9 +117,9 @@ func update(screen *ebiten.Image) {
 			// If Interrupt Master Flag is set, and Interrupt Enable register is
 			// nonzero, and Interrupt Flag register is nonzero,
 			// then we execute an interrupt
-			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
+			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFF] != 0 && GbMMU.Memory[0xFF0F] != 0 {
 				// Get the bit of the interrupt to execute
-				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
+				interrupt := GbMMU.Memory[0xFFFF] & GbMMU.Memory[0xFF0F]
 
 				if interrupt&1 != 0 {
 					// Run VBlank interrupt handler
@@ -205,8 +205,8 @@ func update(screen *ebiten.Image) {
 			}
 
 			// Check for interrupts, as above
-			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFE] != 0 && GbMMU.Memory[0xFF0F] != 0 {
-				interrupt := GbMMU.Memory[0xFFFE] & GbMMU.Memory[0xFF0F]
+			if GbCPU.IME != 0 && GbMMU.Memory[0xFFFF] != 0 && GbMMU.Memory[0xFF0F] != 0 {
+				interrupt := GbMMU.Memory[0xFFFF] & GbMMU.Memory[0xFF0F]
 
 				if interrupt&1 != 0 {
 					// Run VBlank interrupt handler

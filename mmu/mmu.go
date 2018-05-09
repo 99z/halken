@@ -63,15 +63,13 @@ func (gbmmu *GBMMU) InitMMU() {
 // For example, when a ROM writes to 0xFF00, it is really telling our IO
 // handler to select either buttons or dpad
 func (gbmmu *GBMMU) WriteData(addr uint16, data byte) {
-	if addr == 0xFFFF {
-		// Enable interrupts
-		gbmmu.Memory[0xFFFE] = data
-	} else if addr == 0xFF00 {
+	if addr == 0xFF00 {
 		GbIO.SetCol(data)
 	} else if addr == 0xFF0F {
+		// TODO What do writes here really do? Ignored or bit set?
 		// gbmmu.Memory[0xFF0F] |= (1 << 0)
 	} else if addr == 0xFF41 {
-		// Nothing
+		// TODO Same as above
 	} else if addr >= 0x0000 && addr <= 0x150 {
 		// Don't allow writes to invalid locations
 	} else if addr == 0xFF46 {
@@ -92,13 +90,11 @@ func (gbmmu *GBMMU) WriteData(addr uint16, data byte) {
 // Again, for example, reading 0xFF00 should return the last input, which is
 // not stored in any memory directly in my implementation
 func (gbmmu *GBMMU) ReadData(addr uint16) byte {
-	if addr == 0xFFFF {
-		return gbmmu.Memory[0xFFFE]
-	} else if addr == 0xFF00 {
+	if addr == 0xFF00 {
 		return GbIO.GetInput()
-	} else {
-		return gbmmu.Memory[addr]
 	}
+
+	return gbmmu.Memory[addr]
 }
 
 // LoadCart reads cartridge ROM into memory

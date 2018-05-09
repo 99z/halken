@@ -8,8 +8,6 @@ package cpu
 // Reference: http://www.zilog.com/docs/z80/um0080.pdf
 // Page 80 discusses clocks
 type GBCPU struct {
-	// Total machine cycles
-	mCycles int
 	// Total time cycles
 	TCycles  uint16
 	Regs     *Registers
@@ -41,20 +39,15 @@ func (gbcpu *GBCPU) InitCPU() {
 	gbcpu.loadInstructions()
 }
 
-func (gbcpu *GBCPU) readPC() {
-	// TODO
-	// Might need if decide not to export Regs
-}
-
-func (gbcpu *GBCPU) GetFlags() byte {
-	return gbcpu.Regs.f
-}
-
+// pushByteToStack decrements the SP by 1, then writes a byte at the addr
+// pointed to by the SP
 func (gbcpu *GBCPU) pushByteToStack(data byte) {
 	gbcpu.Regs.decrementSP(1)
 	GbMMU.WriteData(gbcpu.sliceToInt(gbcpu.Regs.sp), data)
 }
 
+// popByteFromStack gets the byte at the addr pointed to by the SP
+// then increments the SP by 1
 func (gbcpu *GBCPU) popByteFromStack() byte {
 	result := GbMMU.ReadData(gbcpu.sliceToInt(gbcpu.Regs.sp))
 	gbcpu.Regs.incrementSP(1)

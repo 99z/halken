@@ -352,11 +352,16 @@ func (gblcd *GBLCD) renderTile(tileID int, attrs byte, sprites bool) []*Pixel {
 	return pixels
 }
 
+func (gblcd *GBLCD) setLCDInterrupt() {
+	GbMMU.Memory[0xFF0F] |= (1 << 1)
+}
+
 // setLCDStatus changes the status of the LCD
 // LCD can be in one of four modes
 // Mode switching happens only when a certain condition is met
 // The GB hardware is actually meant to simulate a CRT in terms of timings
 // This is why we have HBlank/VBlank modes
+// Interrupt reference: http://www.emutalk.net/threads/41525-Game-Boy/page120
 func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 	switch gblcd.mode {
 	// Horizontal blanking mode
@@ -378,10 +383,19 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 
 				// Request VBlank interrupt
 				GbMMU.Memory[0xFF0F] |= (1 << 0)
+
+				// Check for LCD STAT interrupt
+				if GbMMU.Memory[stat]&(1<<4) != 0 {
+					gblcd.setLCDInterrupt()
+				}
 			} else {
 				// Enter OAM read mode
 				GbMMU.Memory[stat] &^= (1 << 0)
 				GbMMU.Memory[stat] |= (1 << 1)
+				// Check for LCD STAT interrupt
+				if GbMMU.Memory[stat]&(1<<5) != 0 {
+					gblcd.setLCDInterrupt()
+				}
 				gblcd.mode = 2
 			}
 		}
@@ -398,6 +412,10 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 			if gblcd.currentLine > 153 {
 				GbMMU.Memory[stat] &^= (1 << 0)
 				GbMMU.Memory[stat] |= (1 << 1)
+				// Check for LCD STAT interrupt
+				if GbMMU.Memory[stat]&(1<<5) != 0 {
+					gblcd.setLCDInterrupt()
+				}
 				gblcd.mode = 2
 				GbMMU.Memory[ly] = 0
 				gblcd.currentLine = 0
@@ -419,6 +437,10 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 			gblcd.modeClock = 0
 			GbMMU.Memory[stat] &^= (1 << 0)
 			GbMMU.Memory[stat] &^= (1 << 1)
+			// Check for LCD STAT interrupt
+			if GbMMU.Memory[stat]&(1<<3) != 0 {
+				gblcd.setLCDInterrupt()
+			}
 			gblcd.mode = 0
 		}
 	}
@@ -432,8 +454,8 @@ func (gblcd *GBLCD) setLCDStatus(screen *ebiten.Image) {
 		GbMMU.Memory[stat] |= (1 << 2)
 
 		// LCD STAT interrupt
-		if GbMMU.Memory[0xFFFE]&(1<<1) != 0 {
-			GbMMU.Memory[0xFF0F] |= (1 << 1)
+		if GbMMU.Memory[stat]&(1<<6) != 0 {
+			gblcd.setLCDInterrupt()
 		}
 	} else {
 		// Clear coincidence bit
